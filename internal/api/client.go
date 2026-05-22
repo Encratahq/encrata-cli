@@ -79,7 +79,7 @@ type EmailRequest struct {
 }
 
 func (c *Client) EmailLookup(req *EmailRequest) (json.RawMessage, error) {
-	data, err := c.post("/api/lookup", req)
+	data, err := c.post("/api/agent/lookup", req)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ type GoogleRequest struct {
 }
 
 func (c *Client) GoogleSearch(req *GoogleRequest) (json.RawMessage, error) {
-	data, err := c.post("/api/google-search", req)
+	data, err := c.post("/api/agent/google", req)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +126,7 @@ type CompanyRequest struct {
 }
 
 func (c *Client) CompanySearch(query string) (json.RawMessage, error) {
-	data, err := c.post("/api/company-search", &CompanyRequest{Query: query})
+	data, err := c.post("/api/agent/company", &CompanyRequest{Query: query})
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +140,7 @@ type DomainRequest struct {
 }
 
 func (c *Client) DomainSearch(query string) (json.RawMessage, error) {
-	data, err := c.post("/api/domain-search", &DomainRequest{Query: query})
+	data, err := c.post("/api/agent/domain", &DomainRequest{Query: query})
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +154,7 @@ type IPRequest struct {
 }
 
 func (c *Client) IPSearch(query string) (json.RawMessage, error) {
-	data, err := c.post("/api/ip-search", &IPRequest{Query: query})
+	data, err := c.post("/api/agent/ip", &IPRequest{Query: query})
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +169,7 @@ type DarkwebRequest struct {
 }
 
 func (c *Client) DarkwebSearch(req *DarkwebRequest) (json.RawMessage, error) {
-	data, err := c.post("/api/darkweb-search", req)
+	data, err := c.post("/api/agent/darkweb", req)
 	if err != nil {
 		return nil, err
 	}
