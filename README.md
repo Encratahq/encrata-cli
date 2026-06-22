@@ -1,6 +1,6 @@
 # Encrata CLI
 
-Intelligence lookups from your terminal. Email enrichment, phone intelligence, IP geolocation, domain research, company profiles, Google dorking, and dark web search — all from a single command.
+Intelligence lookups from your terminal. Email enrichment, phone intelligence, IP geolocation, domain research, company profiles, Google dorking, dark web search, web scraping, screenshots, and face recognition — all from a single command.
 
 ## Install
 
@@ -80,6 +80,45 @@ encrata darkweb "user@example.com" --type email
 encrata darkweb "example.com" --type domain
 ```
 
+### Scrape
+
+Fetch the raw HTML of a web page — renders JavaScript and bypasses bot blocks.
+
+```bash
+encrata scrape https://example.com
+encrata scrape https://example.com -o page.html
+encrata scrape https://example.com --no-js --wait-for "#main"
+```
+
+### Extract
+
+Extract clean markdown or structured data from a web page.
+
+```bash
+encrata extract https://example.com
+encrata extract https://example.com --mode markdown
+encrata extract https://example.com --selector title=h1 --selector price=.price
+```
+
+### Screenshot
+
+Capture a full-page or element screenshot (PNG or JPEG).
+
+```bash
+encrata screenshot https://example.com
+encrata screenshot https://example.com -o shot.jpeg --format jpeg
+encrata screenshot https://example.com --viewport --selector "#hero"
+```
+
+### Face Search
+
+Find matching faces and linked identities from an image URL.
+
+```bash
+encrata face https://example.com/photo.jpg
+encrata face https://example.com/photo.jpg --threshold 0.8
+```
+
 ## Options
 
 | Flag | Description |
@@ -106,6 +145,10 @@ Config is stored in `~/.config/encrata/config.json`.
 - `company` — 1 credit
 - `google` — 1 credit
 - `darkweb` — 1 credit (first page; subsequent pages free)
+- `scrape` — 1 credit per page
+- `extract` — 1 credit per page
+- `screenshot` — 1 credit per capture
+- `face` — 5 credits per search
 - `ip` — free
 - `validate` — free
 - `breaches` — free

@@ -57,6 +57,10 @@ func init() {
 	rootCmd.AddCommand(ipCmd)
 	rootCmd.AddCommand(googleCmd)
 	rootCmd.AddCommand(darkwebCmd)
+	rootCmd.AddCommand(scrapeCmd)
+	rootCmd.AddCommand(extractCmd)
+	rootCmd.AddCommand(screenshotCmd)
+	rootCmd.AddCommand(faceCmd)
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(versionCmd)
 }

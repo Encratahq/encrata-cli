@@ -1,11 +1,11 @@
 {
   "name": "encrata-cli",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Encrata CLI — intelligence lookups from your terminal",
   "bin": {
     "encrata": "bin/encrata"
   },
-  "keywords": ["encrata", "osint", "email-lookup", "phone-lookup", "domain-lookup", "ip-lookup", "darkweb", "intelligence", "cli"],
+  "keywords": ["encrata", "osint", "email-lookup", "phone-lookup", "domain-lookup", "ip-lookup", "darkweb", "web-scraping", "screenshot", "face-recognition", "intelligence", "cli"],
   "author": "Encrata <hello@encrata.com>",
   "license": "MIT",
   "homepage": "https://encrata.com",
