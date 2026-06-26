@@ -1,6 +1,6 @@
 name: release
 
-# Runs whenever you push a version tag, e.g.:
+# Runs whenever you push a version tag, for e.g.:
 #   git tag v0.4.0
 #   git push origin v0.4.0
 on:
