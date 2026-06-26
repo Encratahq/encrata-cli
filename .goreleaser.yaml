@@ -1,0 +1,69 @@
+# GoReleaser config — builds, archives, GitHub release, and Homebrew formula.
+# Triggered by a git tag (e.g. v0.4.0). Docs: https://goreleaser.com
+version: 2
+
+project_name: encrata
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: encrata
+    main: .
+    binary: encrata
+    env:
+      - CGO_ENABLED=0
+    # Inject the version (from the git tag) into cmd.version at build time,
+    # and strip debug info (-s -w) to shrink the binary.
+    ldflags:
+      - -s -w -X github.com/Encratahq/cli/cmd.version={{ .Version }}
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  # Produces: encrata_<version>_<os>_<arch>.tar.gz
+  # (matches the asset names the npm installer already expects)
+  - id: default
+    formats:
+      - tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+# Auto-generate and push the Homebrew formula to Encratahq/homebrew-tap.
+# GoReleaser fills in the version, the per-platform URLs, and the sha256 of
+# each archive automatically — no manual editing.
+brews:
+  - name: encrata
+    repository:
+      owner: Encratahq
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: "https://encrata.com"
+    description: "Intelligence lookups from your terminal — email, phone, IP, domain, and OSINT"
+    license: "MIT"
+    commit_author:
+      name: encrata-bot
+      email: hello@encrata.com
+    install: |
+      bin.install "encrata"
+    test: |
+      assert_match version.to_s, shell_output("#{bin}/encrata version")
