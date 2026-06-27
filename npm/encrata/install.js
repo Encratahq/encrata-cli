@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
-const { existsSync, mkdirSync, createWriteStream, chmodSync, unlinkSync } = require("fs");
+const { existsSync, mkdirSync, createWriteStream, chmodSync, unlinkSync, copyFileSync, rmSync } = require("fs");
 const path = require("path");
 const https = require("https");
 const { execSync } = require("child_process");
 
-const VERSION = "0.3.1";
+const VERSION = "0.3.2";
 const REPO = "Encratahq/cli";
 
 const PLATFORM_MAP = {
@@ -29,12 +29,16 @@ if (!platform || !arch) {
 }
 
 const ext = process.platform === "win32" ? ".zip" : ".tar.gz";
-const binName = process.platform === "win32" ? "encrata.exe" : "encrata";
+// Name of the binary *inside* the GoReleaser archive.
+const archiveBinName = process.platform === "win32" ? "encrata.exe" : "encrata";
+// Name we store it as on disk — kept distinct from the committed `encrata`
+// launcher shim so the download never clobbers the npm-linked bin entry.
+const localBinName = process.platform === "win32" ? "encrata-bin.exe" : "encrata-bin";
 const assetName = `encrata_${VERSION}_${platform}_${arch}${ext}`;
 const url = `https://github.com/${REPO}/releases/download/v${VERSION}/${assetName}`;
 
 const destDir = path.join(__dirname, "bin");
-const destPath = path.join(destDir, binName);
+const destPath = path.join(destDir, localBinName);
 
 if (existsSync(destPath)) {
   process.exit(0);
@@ -64,17 +68,23 @@ function download(url, dest) {
 
 async function install() {
   const archivePath = path.join(destDir, assetName);
+  // Extract into a temp subfolder so the archive's `encrata` binary never
+  // overwrites the committed `encrata` launcher shim that npm links to PATH.
+  const extractDir = path.join(destDir, ".extract");
 
   console.log(`Downloading encrata v${VERSION} for ${platform}/${arch}...`);
   await download(url, archivePath);
 
+  mkdirSync(extractDir, { recursive: true });
   if (ext === ".tar.gz") {
-    execSync(`tar -xzf "${archivePath}" -C "${destDir}" ${binName}`, { stdio: "ignore" });
+    execSync(`tar -xzf "${archivePath}" -C "${extractDir}" ${archiveBinName}`, { stdio: "ignore" });
   } else {
-    execSync(`powershell -command "Expand-Archive -Path '${archivePath}' -DestinationPath '${destDir}'"`, { stdio: "ignore" });
+    execSync(`powershell -command "Expand-Archive -Path '${archivePath}' -DestinationPath '${extractDir}' -Force"`, { stdio: "ignore" });
   }
 
+  copyFileSync(path.join(extractDir, archiveBinName), destPath);
   chmodSync(destPath, 0o755);
+  rmSync(extractDir, { recursive: true, force: true });
   unlinkSync(archivePath);
   console.log("encrata installed successfully.");
 }

@@ -9,7 +9,10 @@ npm/darwin-x64/
 npm/linux-arm64/
 npm/linux-x64/
 npm/win32-x64/
-npm/encrata/bin/
+# Downloaded binary (the committed `encrata` launcher shim is kept)
+npm/encrata/bin/encrata-bin
+npm/encrata/bin/encrata-bin.exe
+npm/encrata/bin/.extract/
 
 # IDE
 .idea/

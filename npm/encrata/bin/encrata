@@ -1,0 +1,28 @@
+#!/usr/bin/env node
+
+// Launcher shim. This file is committed and shipped in the npm package so that
+// npm always has a `bin` target to symlink onto PATH at install time (npm links
+// bins *before* postinstall runs). The actual platform binary is downloaded by
+// install.js into the same directory as `encrata-bin` and exec'd from here.
+
+const { spawnSync } = require("child_process");
+const { existsSync } = require("fs");
+const path = require("path");
+
+const binName = process.platform === "win32" ? "encrata-bin.exe" : "encrata-bin";
+const binPath = path.join(__dirname, binName);
+
+if (!existsSync(binPath)) {
+  console.error("encrata binary not found. Reinstall with: npm install -g encrata-cli");
+  console.error("Or install from source: go install github.com/Encratahq/cli@latest");
+  process.exit(1);
+}
+
+const result = spawnSync(binPath, process.argv.slice(2), { stdio: "inherit" });
+
+if (result.error) {
+  console.error(result.error.message);
+  process.exit(1);
+}
+
+process.exit(result.status === null ? 1 : result.status);
