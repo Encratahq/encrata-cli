@@ -41,6 +41,7 @@ Expand-Archive -Path $zipPath -DestinationPath $InstallDir -Force
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if ($userPath -notlike "*$InstallDir*") {
   [Environment]::SetEnvironmentVariable("Path", "$userPath;$InstallDir", "User")
+  $env:Path = "$env:Path;$InstallDir"
   Write-Host "Added Encrata to your user PATH. Open a new PowerShell window to use it."
 }
 
