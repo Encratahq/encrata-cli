@@ -27,7 +27,7 @@ encrata version
 Install a specific version:
 
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/Encratahq/cli/main/install.ps1))) -Version 0.3.1
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/Encratahq/cli/main/install.ps1))) -Version 0.3.3
 ```
 
 Update to the latest version by running the same install command again.
