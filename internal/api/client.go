@@ -151,10 +151,11 @@ func (c *Client) DomainSearch(query string) (json.RawMessage, error) {
 
 type IPRequest struct {
 	Query string `json:"query"`
+	IP    string `json:"ip"`
 }
 
 func (c *Client) IPSearch(query string) (json.RawMessage, error) {
-	data, err := c.post("/api/agent/ip", &IPRequest{Query: query})
+	data, err := c.post("/api/agent/ip", &IPRequest{Query: query, IP: query})
 	if err != nil {
 		return nil, err
 	}
