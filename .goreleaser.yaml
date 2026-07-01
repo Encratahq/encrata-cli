@@ -21,16 +21,21 @@ builds:
     goos:
       - darwin
       - linux
+      - windows
     goarch:
       - amd64
       - arm64
 
 archives:
-  # Produces: encrata_<version>_<os>_<arch>.tar.gz
+  # Produces: encrata_<version>_<os>_<arch>.tar.gz for Unix and .zip for Windows
   # (matches the asset names the npm installer already expects)
   - id: default
     formats:
       - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - README.md

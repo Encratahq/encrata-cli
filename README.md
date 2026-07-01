@@ -4,11 +4,78 @@ Intelligence lookups from your terminal. Email enrichment, phone intelligence, I
 
 ## Install
 
+Choose the install method that fits your environment.
+
+### Windows PowerShell
+
+Recommended for Windows users. This does not require Node.js or npm.
+
+```powershell
+irm https://raw.githubusercontent.com/Encratahq/cli/main/install.ps1 | iex
+```
+
+The installer downloads the latest Windows release from GitHub, extracts
+`encrata.exe` to `%LOCALAPPDATA%\Programs\Encrata`, and adds that directory to
+your user `PATH`.
+
+Open a new PowerShell window after installation, then verify:
+
+```powershell
+encrata version
+```
+
+Install a specific version:
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/Encratahq/cli/main/install.ps1))) -Version 0.3.1
+```
+
+Update to the latest version by running the same install command again.
+
+### Homebrew
+
+Recommended for macOS users.
+
+```bash
+brew tap Encratahq/tap
+brew install encrata
+```
+
+Or install directly:
+
+```bash
+brew install Encratahq/tap/encrata
+```
+
+Verify the install:
+
+```bash
+encrata version
+```
+
+### npm
+
+Recommended for developers who already use Node.js/npm.
+
 ```bash
 npm install -g encrata-cli
 ```
 
-Or download the binary from [Releases](https://github.com/Encratahq/cli/releases).
+Verify the install:
+
+```bash
+encrata version
+```
+
+The npm package installs a small wrapper that downloads the matching Encrata
+binary for your operating system from GitHub Releases.
+
+### Manual Download
+
+Download prebuilt binaries from [GitHub Releases](https://github.com/Encratahq/cli/releases).
+
+Windows users should download the `windows_amd64.zip` or `windows_arm64.zip`
+asset, extract it, and run `encrata.exe`.
 
 ## Setup
 
