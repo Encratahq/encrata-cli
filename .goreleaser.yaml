@@ -67,7 +67,7 @@ brews:
     license: "MIT"
     commit_author:
       name: encrata-bot
-      email: hello@encrata.com
+      email: support@encrata.com
     install: |
       bin.install "encrata"
     test: |

@@ -1,6 +1,5 @@
 package cmd
 
-
 import (
 	"encoding/json"
 	"fmt"
@@ -54,11 +53,11 @@ var ipCmd = &cobra.Command{
 				Type   string `json:"type"`
 			} `json:"company"`
 			Threat *struct {
-				IsTor     bool `json:"is_tor"`
-				IsProxy   bool `json:"is_proxy"`
-				IsVPN     bool `json:"is_vpn"`
-				IsAbuser  bool `json:"is_abuser"`
-				IsBot     bool `json:"is_bot"`
+				IsTor    bool `json:"is_tor"`
+				IsProxy  bool `json:"is_proxy"`
+				IsVPN    bool `json:"is_vpn"`
+				IsAbuser bool `json:"is_abuser"`
+				IsBot    bool `json:"is_bot"`
 			} `json:"threat"`
 			Credits float64 `json:"credits"`
 		}

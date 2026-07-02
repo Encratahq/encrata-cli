@@ -9,7 +9,7 @@ import (
 // version is the CLI version. It defaults to the value below for local builds
 // (go run / go build) and is overridden at release time by GoReleaser via
 // -ldflags "-X github.com/Encratahq/cli/cmd.version=<git tag>".
-var version = "0.3.1"
+var version = "0.4.0"
 
 var versionCmd = &cobra.Command{
 	Use:   "version",

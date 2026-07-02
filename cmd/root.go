@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/Encratahq/cli/internal/api"
 	"github.com/Encratahq/cli/internal/config"
 	"github.com/Encratahq/cli/internal/output"
 	"github.com/spf13/cobra"
@@ -61,12 +62,22 @@ func init() {
 	rootCmd.AddCommand(extractCmd)
 	rootCmd.AddCommand(screenshotCmd)
 	rootCmd.AddCommand(faceCmd)
+	rootCmd.AddCommand(validateCmd)
+	rootCmd.AddCommand(breachesCmd)
+	rootCmd.AddCommand(bulkCmd)
+	rootCmd.AddCommand(listsCmd)
+	rootCmd.AddCommand(monitorsCmd)
+	rootCmd.AddCommand(workflowsCmd)
+	rootCmd.AddCommand(keysCmd)
+	rootCmd.AddCommand(webhooksCmd)
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(versionCmd)
 }
 
 func initConfig() {
 	cfg = config.Load()
+
+	api.Version = version
 
 	if key, _ := rootCmd.PersistentFlags().GetString("api-key"); key != "" {
 		cfg.APIKey = key

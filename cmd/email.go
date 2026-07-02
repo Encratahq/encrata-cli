@@ -26,6 +26,7 @@ var emailCmd = &cobra.Command{
 		num, _ := cmd.Flags().GetInt("num")
 		page, _ := cmd.Flags().GetInt("page")
 		fields, _ := cmd.Flags().GetStringSlice("fields")
+		nocache, _ := cmd.Flags().GetBool("nocache")
 
 		req := &api.EmailRequest{
 			Email:   args[0],
@@ -36,7 +37,7 @@ var emailCmd = &cobra.Command{
 			Fields:  fields,
 		}
 
-		data, err := client.EmailLookup(req)
+		data, err := client.EmailLookup(req, nocache)
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -120,4 +121,5 @@ func init() {
 	emailCmd.Flags().Int("num", 0, "Number of results")
 	emailCmd.Flags().Int("page", 0, "Page number")
 	emailCmd.Flags().StringSlice("fields", nil, "Specific fields to return")
+	emailCmd.Flags().Bool("nocache", false, "Bypass the cache and run a fresh lookup")
 }

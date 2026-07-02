@@ -34,14 +34,14 @@ var companyCmd = &cobra.Command{
 		var result struct {
 			Query   string `json:"query"`
 			Company *struct {
-				Name         string   `json:"name"`
-				Description  string   `json:"description"`
-				Industry     string   `json:"industry"`
-				Headquarter  string   `json:"headquarter"`
-				Website      string   `json:"website"`
-				Employees    int      `json:"employees"`
-				Followers    int      `json:"followers"`
-				Specialties  []string `json:"specialties"`
+				Name        string   `json:"name"`
+				Description string   `json:"description"`
+				Industry    string   `json:"industry"`
+				Headquarter string   `json:"headquarter"`
+				Website     string   `json:"website"`
+				Employees   int      `json:"employees"`
+				Followers   int      `json:"followers"`
+				Specialties []string `json:"specialties"`
 			} `json:"company"`
 			Credits float64 `json:"credits"`
 		}

@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+
 
 const { existsSync, mkdirSync, createWriteStream, chmodSync, unlinkSync, copyFileSync, rmSync } = require("fs");
 const path = require("path");

@@ -1,15 +1,12 @@
 name: release
 
-# Runs whenever you push a version tag, for e.g.:
-#   git tag v0.4.0
-#   git push origin v0.4.0
 on:
   push:
     tags:
       - "v*"
 
 permissions:
-  contents: write # needed to create the GitHub Release in this repo
+  contents: write
 
 jobs:
   goreleaser:
@@ -18,7 +15,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # full history so GoReleaser can build the changelog
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -32,9 +29,5 @@ jobs:
           version: "~> v2"
           args: release --clean
         env:
-          # Provided automatically by Actions — used to create the Release here.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # A Personal Access Token (or fine-grained token) with WRITE access to
-          # Encratahq/homebrew-tap, so GoReleaser can push the updated formula.
-          # Add it under: cli repo → Settings → Secrets and variables → Actions.
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
