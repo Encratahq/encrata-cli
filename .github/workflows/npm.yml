@@ -1,0 +1,59 @@
+name: npm
+
+on:
+  pull_request:
+    paths:
+      - "npm/encrata/**"
+      - ".github/workflows/npm.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "npm/encrata/**"
+      - ".github/workflows/npm.yml"
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: npm/encrata
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: npm/encrata/package.json
+
+      - name: Validate package metadata
+        run: |
+          node -e "
+          const fs = require('fs');
+          const pkg = require('./package.json');
+          const install = fs.readFileSync('install.js', 'utf8');
+          const match = install.match(/const VERSION = \"([^\"]+)\";/);
+          if (!match) throw new Error('install.js VERSION constant was not found');
+          if (pkg.version !== match[1]) {
+            throw new Error('package.json version ' + pkg.version + ' does not match install.js VERSION ' + match[1]);
+          }
+          if (!pkg.bin || pkg.bin.encrata !== 'bin/encrata') {
+            throw new Error('package.json bin.encrata must point to bin/encrata');
+          }
+          if (!fs.existsSync('bin/encrata')) {
+            throw new Error('bin/encrata launcher is missing');
+          }
+          "
+
+      - name: Syntax check installer
+        run: node --check install.js
+
+      - name: Syntax check launcher
+        run: node --check bin/encrata
+
+      - name: Check package contents
+        run: npm pack --dry-run
