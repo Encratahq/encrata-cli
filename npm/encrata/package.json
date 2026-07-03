@@ -11,7 +11,7 @@
   "homepage": "https://encrata.com",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Encratahq/cli.git"
+    "url": "git+https://github.com/Encratahq/encrata-cli.git"
   },
   "engines": {
     "node": ">=14"
