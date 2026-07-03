@@ -72,6 +72,7 @@ func init() {
 	rootCmd.AddCommand(webhooksCmd)
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(updateCmd)
 }
 
 func initConfig() {
