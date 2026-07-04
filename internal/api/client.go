@@ -137,7 +137,7 @@ func (c *Client) do(method, path string, query url.Values, payload interface{}) 
 }
 
 // stream issues a POST and invokes onEvent for each server-sent data line.
-func (c *Client) stream(path string, payload interface{}, onEvent func(json.RawMessage) error) error {
+func (c *Client) stream(path string, payload interface{}, onEvent func(eventType string, data json.RawMessage) error) error {
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to encode request: %w", err)
@@ -164,8 +164,18 @@ func (c *Client) stream(path string, payload interface{}, onEvent func(json.RawM
 
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 8*1024*1024)
+	eventType := ""
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			// Blank line marks the end of an SSE event; reset the type.
+			eventType = ""
+			continue
+		}
+		if strings.HasPrefix(line, "event:") {
+			eventType = strings.TrimSpace(line[len("event:"):])
+			continue
+		}
 		if !strings.HasPrefix(line, "data:") {
 			continue
 		}
@@ -176,7 +186,7 @@ func (c *Client) stream(path string, payload interface{}, onEvent func(json.RawM
 		if event == "[DONE]" {
 			break
 		}
-		if err := onEvent(json.RawMessage(event)); err != nil {
+		if err := onEvent(eventType, json.RawMessage(event)); err != nil {
 			return err
 		}
 	}

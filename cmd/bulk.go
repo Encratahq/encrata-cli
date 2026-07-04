@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/Encratahq/cli/internal/api"
 	"github.com/Encratahq/cli/internal/output"
@@ -99,13 +100,17 @@ func collectInputs(cmd *cobra.Command, args []string) ([]string, error) {
 	return args, nil
 }
 
-func printPersonLine(person map[string]interface{}) {
-	name := getStr(person, "name")
+func printPersonLine(resp map[string]interface{}) {
+	email := getStr(resp, "email")
+	name := ""
+	company := ""
+	if person, ok := resp["person"].(map[string]interface{}); ok {
+		name = strings.TrimSpace(getStr(person, "first_name") + " " + getStr(person, "last_name"))
+		company = getStr(person, "company")
+	}
 	if name == "" {
 		name = "—"
 	}
-	email := getStr(person, "email")
-	company := getStr(person, "company")
 	line := fmt.Sprintf("  • %s  %s", output.Bold.Sprint(name), output.Dim.Sprint(email))
 	if company != "" {
 		line += output.Dim.Sprint("  · " + company)

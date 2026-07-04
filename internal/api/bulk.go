@@ -15,19 +15,29 @@ func (c *Client) BulkLookup(emails, fields []string, onPerson func(json.RawMessa
 		q.Set("fields", strings.Join(fields, ","))
 		path += "?" + q.Encode()
 	}
-	return c.stream(path, map[string][]string{"emails": emails}, onPerson)
+	return c.stream(path, map[string][]string{"emails": emails}, func(eventType string, event json.RawMessage) error {
+		// The stream emits start/result/error/done events. Only "result"
+		// events carry an enriched person, nested under the "data" field.
+		if eventType != "result" {
+			return nil
+		}
+		var envelope struct {
+			Data json.RawMessage `json:"data"`
+		}
+		if json.Unmarshal(event, &envelope) == nil && envelope.Data != nil {
+			return onPerson(envelope.Data)
+		}
+		return nil
+	})
 }
 
 // BulkSearch aggregates a bulk search stream (google/company/domain/ip) into a
 // single result set.
 func (c *Client) BulkSearch(path string, queries []string) (json.RawMessage, error) {
 	var results []json.RawMessage
-	err := c.stream(path, map[string][]string{"queries": queries}, func(event json.RawMessage) error {
-		var envelope struct {
-			Results []json.RawMessage `json:"results"`
-		}
-		if json.Unmarshal(event, &envelope) == nil && envelope.Results != nil {
-			results = append(results, envelope.Results...)
+	err := c.stream(path, map[string][]string{"queries": queries}, func(eventType string, event json.RawMessage) error {
+		// Only "result" events carry search results; skip start/done.
+		if eventType != "result" {
 			return nil
 		}
 		results = append(results, event)
