@@ -38,7 +38,7 @@ var screenshotCmd = &cobra.Command{
 			req.Timeout = timeout
 		}
 
-		data, err := client.Screenshot(req)
+		data, err := client.Screenshot(cmd.Context(), req)
 		if err != nil {
 			output.Error(err.Error())
 			return err

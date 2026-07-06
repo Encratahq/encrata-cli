@@ -34,7 +34,7 @@ var scrapeCmd = &cobra.Command{
 			req.Timeout = timeout
 		}
 
-		data, err := client.Scrape(req)
+		data, err := client.Scrape(cmd.Context(), req)
 		if err != nil {
 			output.Error(err.Error())
 			return err

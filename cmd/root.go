@@ -1,7 +1,11 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/Encratahq/cli/internal/api"
 	"github.com/Encratahq/cli/internal/config"
@@ -38,8 +42,16 @@ var rootCmd = &cobra.Command{
 }
 
 func Execute() error {
-	err := rootCmd.Execute()
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	err := rootCmd.ExecuteContext(ctx)
 	if err != nil {
+		if ctx.Err() != nil {
+			output.Error("Aborted.")
+			return nil
+		}
 		output.Error(err.Error())
 	}
 	return err

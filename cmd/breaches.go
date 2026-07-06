@@ -19,7 +19,7 @@ var breachesCmd = &cobra.Command{
 			return err
 		}
 
-		data, err := client.Breaches(args[0])
+		data, err := client.Breaches(cmd.Context(), args[0])
 		if err != nil {
 			output.Error(err.Error())
 			return err

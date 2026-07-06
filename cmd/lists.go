@@ -22,7 +22,7 @@ var listsLsCmd = &cobra.Command{
 			return err
 		}
 		listType, _ := cmd.Flags().GetString("type")
-		data, err := client.ListContactLists(listType)
+		data, err := client.ListContactLists(cmd.Context(), listType)
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -68,7 +68,7 @@ var listsCreateCmd = &cobra.Command{
 		listType, _ := cmd.Flags().GetString("type")
 		targets, _ := cmd.Flags().GetStringSlice("targets")
 
-		data, err := client.CreateContactList(&api.ListCreateRequest{
+		data, err := client.CreateContactList(cmd.Context(), &api.ListCreateRequest{
 			Name:    args[0],
 			Type:    listType,
 			Targets: targets,
@@ -106,7 +106,7 @@ var listsRmCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		data, err := client.DeleteContactList(args[0])
+		data, err := client.DeleteContactList(cmd.Context(), args[0])
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -129,7 +129,7 @@ var listsEmailsCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		data, err := client.ListContactListEmails(args[0])
+		data, err := client.ListContactListEmails(cmd.Context(), args[0])
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -164,7 +164,7 @@ var listsAddCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		data, err := client.AddContactListEmails(args[0], args[1:])
+		data, err := client.AddContactListEmails(cmd.Context(), args[0], args[1:])
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -190,7 +190,7 @@ var listsRemoveCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		data, err := client.DeleteContactListEmails(args[0], args[1:])
+		data, err := client.DeleteContactListEmails(cmd.Context(), args[0], args[1:])
 		if err != nil {
 			output.Error(err.Error())
 			return err

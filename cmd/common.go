@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"strings"
@@ -87,13 +88,13 @@ func unwrapArray(data json.RawMessage, key string) []interface{} {
 }
 
 // simpleGet builds a RunE that fetches a resource by ID and prints it as JSON.
-func simpleGet(fn func(*api.Client, string) (json.RawMessage, error), title string) func(*cobra.Command, []string) error {
+func simpleGet(fn func(*api.Client, context.Context, string) (json.RawMessage, error), title string) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		client, err := newClient()
 		if err != nil {
 			return err
 		}
-		data, err := fn(client, args[0])
+		data, err := fn(client, cmd.Context(), args[0])
 		if err != nil {
 			output.Error(err.Error())
 			return err

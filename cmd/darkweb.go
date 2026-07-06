@@ -28,7 +28,7 @@ var darkwebCmd = &cobra.Command{
 			Offset: offset,
 		}
 
-		data, err := client.DarkwebSearch(req)
+		data, err := client.DarkwebSearch(cmd.Context(), req)
 		if err != nil {
 			output.Error(err.Error())
 			return err

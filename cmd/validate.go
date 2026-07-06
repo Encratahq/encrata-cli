@@ -16,7 +16,7 @@ var validateCmd = &cobra.Command{
 			return err
 		}
 
-		data, err := client.Validate(args[0])
+		data, err := client.Validate(cmd.Context(), args[0])
 		if err != nil {
 			output.Error(err.Error())
 			return err

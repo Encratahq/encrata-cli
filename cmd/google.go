@@ -36,7 +36,7 @@ var googleCmd = &cobra.Command{
 			Page:    page,
 		}
 
-		data, err := client.GoogleSearch(req)
+		data, err := client.GoogleSearch(cmd.Context(), req)
 		if err != nil {
 			output.Error(err.Error())
 			return err

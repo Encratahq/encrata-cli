@@ -3,6 +3,7 @@ package api
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -34,18 +35,20 @@ var retryableStatus = map[int]bool{
 }
 
 type Client struct {
-	BaseURL    string
-	APIKey     string
-	UserAgent  string
-	HTTPClient *http.Client
+	BaseURL      string
+	APIKey       string
+	UserAgent    string
+	HTTPClient   *http.Client
+	streamClient *http.Client
 }
 
 func New(baseURL, apiKey string) *Client {
 	return &Client{
-		BaseURL:    strings.TrimRight(baseURL, "/"),
-		APIKey:     apiKey,
-		UserAgent:  "encrata-cli/" + Version,
-		HTTPClient: &http.Client{Timeout: requestTimeout},
+		BaseURL:      strings.TrimRight(baseURL, "/"),
+		APIKey:       apiKey,
+		UserAgent:    "encrata-cli/" + Version,
+		HTTPClient:   &http.Client{Timeout: requestTimeout},
+		streamClient: &http.Client{Timeout: streamTimeout},
 	}
 }
 
@@ -71,7 +74,7 @@ func (c *Client) setHeaders(req *http.Request, hasBody bool) {
 	req.Header.Set("User-Agent", c.UserAgent)
 }
 
-func (c *Client) do(method, path string, query url.Values, payload interface{}) (json.RawMessage, error) {
+func (c *Client) do(ctx context.Context, method, path string, query url.Values, payload interface{}) (json.RawMessage, error) {
 	var body []byte
 	if payload != nil {
 		b, err := json.Marshal(payload)
@@ -93,7 +96,7 @@ func (c *Client) do(method, path string, query url.Values, payload interface{}) 
 			reader = bytes.NewReader(body)
 		}
 
-		req, err := http.NewRequest(method, endpoint, reader)
+		req, err := http.NewRequestWithContext(ctx, method, endpoint, reader)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create request: %w", err)
 		}
@@ -101,9 +104,14 @@ func (c *Client) do(method, path string, query url.Values, payload interface{}) 
 
 		resp, err := c.HTTPClient.Do(req)
 		if err != nil {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
 			lastErr = fmt.Errorf("request failed: %w", err)
 			if attempt < maxRetries {
-				time.Sleep(retryDelay(attempt, ""))
+				if err := sleepCtx(ctx, retryDelay(attempt, "")); err != nil {
+					return nil, err
+				}
 				continue
 			}
 			return nil, lastErr
@@ -112,9 +120,14 @@ func (c *Client) do(method, path string, query url.Values, payload interface{}) 
 		data, readErr := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		if readErr != nil {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
 			lastErr = fmt.Errorf("failed to read response: %w", readErr)
 			if attempt < maxRetries {
-				time.Sleep(retryDelay(attempt, ""))
+				if err := sleepCtx(ctx, retryDelay(attempt, "")); err != nil {
+					return nil, err
+				}
 				continue
 			}
 			return nil, lastErr
@@ -122,7 +135,9 @@ func (c *Client) do(method, path string, query url.Values, payload interface{}) 
 
 		if retryableStatus[resp.StatusCode] && attempt < maxRetries {
 			lastErr = parseError(resp.StatusCode, data)
-			time.Sleep(retryDelay(attempt, resp.Header.Get("Retry-After")))
+			if err := sleepCtx(ctx, retryDelay(attempt, resp.Header.Get("Retry-After"))); err != nil {
+				return nil, err
+			}
 			continue
 		}
 
@@ -136,22 +151,33 @@ func (c *Client) do(method, path string, query url.Values, payload interface{}) 
 	return nil, lastErr
 }
 
+// sleepCtx waits for d or until ctx is cancelled, whichever comes first.
+func sleepCtx(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
 // stream issues a POST and invokes onEvent for each server-sent data line.
-func (c *Client) stream(path string, payload interface{}, onEvent func(eventType string, data json.RawMessage) error) error {
+func (c *Client) stream(ctx context.Context, path string, payload interface{}, onEvent func(eventType string, data json.RawMessage) error) error {
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to encode request: %w", err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, c.BaseURL+path, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+path, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 	c.setHeaders(req, true)
 	req.Header.Set("Accept", "text/event-stream")
 
-	client := &http.Client{Timeout: streamTimeout}
-	resp, err := client.Do(req)
+	resp, err := c.streamClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
@@ -193,24 +219,24 @@ func (c *Client) stream(path string, payload interface{}, onEvent func(eventType
 	return scanner.Err()
 }
 
-func (c *Client) post(path string, payload interface{}) (json.RawMessage, error) {
-	return c.do(http.MethodPost, path, nil, payload)
+func (c *Client) post(ctx context.Context, path string, payload interface{}) (json.RawMessage, error) {
+	return c.do(ctx, http.MethodPost, path, nil, payload)
 }
 
-func (c *Client) postQuery(path string, query url.Values, payload interface{}) (json.RawMessage, error) {
-	return c.do(http.MethodPost, path, query, payload)
+func (c *Client) postQuery(ctx context.Context, path string, query url.Values, payload interface{}) (json.RawMessage, error) {
+	return c.do(ctx, http.MethodPost, path, query, payload)
 }
 
-func (c *Client) get(path string, query url.Values) (json.RawMessage, error) {
-	return c.do(http.MethodGet, path, query, nil)
+func (c *Client) get(ctx context.Context, path string, query url.Values) (json.RawMessage, error) {
+	return c.do(ctx, http.MethodGet, path, query, nil)
 }
 
-func (c *Client) put(path string, payload interface{}) (json.RawMessage, error) {
-	return c.do(http.MethodPut, path, nil, payload)
+func (c *Client) put(ctx context.Context, path string, payload interface{}) (json.RawMessage, error) {
+	return c.do(ctx, http.MethodPut, path, nil, payload)
 }
 
-func (c *Client) del(path string, query url.Values, payload interface{}) (json.RawMessage, error) {
-	return c.do(http.MethodDelete, path, query, payload)
+func (c *Client) del(ctx context.Context, path string, query url.Values, payload interface{}) (json.RawMessage, error) {
+	return c.do(ctx, http.MethodDelete, path, query, payload)
 }
 
 func retryDelay(attempt int, retryAfter string) time.Duration {

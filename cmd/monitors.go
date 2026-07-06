@@ -21,7 +21,7 @@ var monitorsLsCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		data, err := client.ListMonitors()
+		data, err := client.ListMonitors(cmd.Context())
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -80,7 +80,7 @@ var monitorsCreateCmd = &cobra.Command{
 			req.DataSourceRef = listID
 		}
 
-		data, err := client.CreateMonitor(req)
+		data, err := client.CreateMonitor(cmd.Context(), req)
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -114,7 +114,7 @@ var monitorsRunCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		data, err := client.TriggerMonitorRun(args[0])
+		data, err := client.TriggerMonitorRun(cmd.Context(), args[0])
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -143,7 +143,7 @@ var monitorsRunsCmd = &cobra.Command{
 		}
 		limit, _ := cmd.Flags().GetInt("limit")
 		offset, _ := cmd.Flags().GetInt("offset")
-		data, err := client.ListMonitorRuns(args[0], limit, offset)
+		data, err := client.ListMonitorRuns(cmd.Context(), args[0], limit, offset)
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -189,7 +189,7 @@ var monitorsResultsCmd = &cobra.Command{
 		changesOnly, _ := cmd.Flags().GetBool("changes-only")
 		limit, _ := cmd.Flags().GetInt("limit")
 		offset, _ := cmd.Flags().GetInt("offset")
-		data, err := client.GetMonitorRunResults(args[0], args[1], changesOnly, limit, offset)
+		data, err := client.GetMonitorRunResults(cmd.Context(), args[0], args[1], changesOnly, limit, offset)
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -209,7 +209,7 @@ var monitorsAllRunsCmd = &cobra.Command{
 		}
 		limit, _ := cmd.Flags().GetInt("limit")
 		offset, _ := cmd.Flags().GetInt("offset")
-		data, err := client.ListAllMonitorRuns(limit, offset)
+		data, err := client.ListAllMonitorRuns(cmd.Context(), limit, offset)
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -254,7 +254,7 @@ var monitorsAllResultsCmd = &cobra.Command{
 		changesOnly, _ := cmd.Flags().GetBool("changes-only")
 		limit, _ := cmd.Flags().GetInt("limit")
 		offset, _ := cmd.Flags().GetInt("offset")
-		data, err := client.ListAllMonitorResults(changesOnly, limit, offset)
+		data, err := client.ListAllMonitorResults(cmd.Context(), changesOnly, limit, offset)
 		if err != nil {
 			output.Error(err.Error())
 			return err

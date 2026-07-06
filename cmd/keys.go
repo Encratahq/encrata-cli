@@ -20,7 +20,7 @@ var keysLsCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		data, err := client.ListKeys()
+		data, err := client.ListKeys(cmd.Context())
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -62,7 +62,7 @@ var keysCreateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		data, err := client.CreateKey(args[0])
+		data, err := client.CreateKey(cmd.Context(), args[0])
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -91,7 +91,7 @@ var keysRevokeCmd = &cobra.Command{
 			return err
 		}
 		permanent, _ := cmd.Flags().GetBool("permanent")
-		data, err := client.RevokeKey(args[0], permanent)
+		data, err := client.RevokeKey(cmd.Context(), args[0], permanent)
 		if err != nil {
 			output.Error(err.Error())
 			return err

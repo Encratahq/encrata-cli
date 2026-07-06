@@ -27,7 +27,7 @@ var faceCmd = &cobra.Command{
 			req.Threshold = &t
 		}
 
-		data, err := client.FaceSearch(req)
+		data, err := client.FaceSearch(cmd.Context(), req)
 		if err != nil {
 			output.Error(err.Error())
 			return err

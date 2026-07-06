@@ -20,7 +20,7 @@ var companyCmd = &cobra.Command{
 		}
 
 		client := api.New(cfg.BaseURL, cfg.APIKey)
-		data, err := client.CompanySearch(args[0])
+		data, err := client.CompanySearch(cmd.Context(), args[0])
 		if err != nil {
 			output.Error(err.Error())
 			return err

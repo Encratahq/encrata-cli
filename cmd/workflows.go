@@ -25,7 +25,7 @@ var workflowsLsCmd = &cobra.Command{
 		page, _ := cmd.Flags().GetInt("page")
 		limit, _ := cmd.Flags().GetInt("limit")
 		status, _ := cmd.Flags().GetString("status")
-		data, err := client.ListWorkflows(page, limit, status)
+		data, err := client.ListWorkflows(cmd.Context(), page, limit, status)
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -88,7 +88,7 @@ var workflowsCreateCmd = &cobra.Command{
 			req.Steps = def.Steps
 		}
 
-		data, err := client.CreateWorkflow(req)
+		data, err := client.CreateWorkflow(cmd.Context(), req)
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -149,7 +149,7 @@ var workflowsUpdateCmd = &cobra.Command{
 			req.Steps = def.Steps
 		}
 
-		data, err := client.UpdateWorkflow(args[0], req)
+		data, err := client.UpdateWorkflow(cmd.Context(), args[0], req)
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -174,7 +174,7 @@ var workflowsRunsCmd = &cobra.Command{
 		page, _ := cmd.Flags().GetInt("page")
 		limit, _ := cmd.Flags().GetInt("limit")
 		workflowID, _ := cmd.Flags().GetString("workflow-id")
-		data, err := client.ListWorkflowRuns(page, limit, workflowID)
+		data, err := client.ListWorkflowRuns(cmd.Context(), page, limit, workflowID)
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -223,7 +223,7 @@ var workflowsTemplatesCmd = &cobra.Command{
 			return err
 		}
 		category, _ := cmd.Flags().GetString("category")
-		data, err := client.ListWorkflowTemplates(category)
+		data, err := client.ListWorkflowTemplates(cmd.Context(), category)
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -268,7 +268,7 @@ var workflowsSecretsLsCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		data, err := client.ListWorkflowSecrets()
+		data, err := client.ListWorkflowSecrets(cmd.Context())
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -301,7 +301,7 @@ var workflowsSecretsSetCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		data, err := client.CreateWorkflowSecret(args[0], args[1])
+		data, err := client.CreateWorkflowSecret(cmd.Context(), args[0], args[1])
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -324,7 +324,7 @@ var workflowsSecretsRmCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		data, err := client.DeleteWorkflowSecret(args[0])
+		data, err := client.DeleteWorkflowSecret(cmd.Context(), args[0])
 		if err != nil {
 			output.Error(err.Error())
 			return err

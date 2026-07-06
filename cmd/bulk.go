@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -37,7 +38,7 @@ var bulkLookupCmd = &cobra.Command{
 		}
 
 		count := 0
-		err = client.BulkLookup(emails, fields, func(event json.RawMessage) error {
+		err = client.BulkLookup(cmd.Context(), emails, fields, func(event json.RawMessage) error {
 			count++
 			if asJSON {
 				output.JSON(event)
@@ -62,7 +63,7 @@ var bulkLookupCmd = &cobra.Command{
 	},
 }
 
-func bulkSearchCmd(use, short string, fn func(*api.Client, []string) (json.RawMessage, error)) *cobra.Command {
+func bulkSearchCmd(use, short string, fn func(*api.Client, context.Context, []string) (json.RawMessage, error)) *cobra.Command {
 	return &cobra.Command{
 		Use:   use,
 		Short: short,
@@ -75,7 +76,7 @@ func bulkSearchCmd(use, short string, fn func(*api.Client, []string) (json.RawMe
 			if err != nil {
 				return err
 			}
-			data, err := fn(client, queries)
+			data, err := fn(client, cmd.Context(), queries)
 			if err != nil {
 				output.Error(err.Error())
 				return err

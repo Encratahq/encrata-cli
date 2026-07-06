@@ -20,7 +20,7 @@ var domainCmd = &cobra.Command{
 		}
 
 		client := api.New(cfg.BaseURL, cfg.APIKey)
-		data, err := client.DomainSearch(args[0])
+		data, err := client.DomainSearch(cmd.Context(), args[0])
 		if err != nil {
 			output.Error(err.Error())
 			return err

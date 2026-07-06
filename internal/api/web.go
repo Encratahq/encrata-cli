@@ -1,6 +1,9 @@
 package api
 
-import "encoding/json"
+import (
+	"context"
+	"encoding/json"
+)
 
 type ScrapeRequest struct {
 	URL           string `json:"url"`
@@ -11,8 +14,8 @@ type ScrapeRequest struct {
 	Timeout       int    `json:"timeout,omitempty"`
 }
 
-func (c *Client) Scrape(req *ScrapeRequest) (json.RawMessage, error) {
-	return c.post("/api/agent/scrape", req)
+func (c *Client) Scrape(ctx context.Context, req *ScrapeRequest) (json.RawMessage, error) {
+	return c.post(ctx, "/api/agent/scrape", req)
 }
 
 type ExtractRequest struct {
@@ -26,8 +29,8 @@ type ExtractRequest struct {
 	Timeout       int               `json:"timeout,omitempty"`
 }
 
-func (c *Client) Extract(req *ExtractRequest) (json.RawMessage, error) {
-	return c.post("/api/agent/extract", req)
+func (c *Client) Extract(ctx context.Context, req *ExtractRequest) (json.RawMessage, error) {
+	return c.post(ctx, "/api/agent/extract", req)
 }
 
 type ScreenshotRequest struct {
@@ -42,6 +45,6 @@ type ScreenshotRequest struct {
 	Timeout       int    `json:"timeout,omitempty"`
 }
 
-func (c *Client) Screenshot(req *ScreenshotRequest) (json.RawMessage, error) {
-	return c.post("/api/agent/screenshot", req)
+func (c *Client) Screenshot(ctx context.Context, req *ScreenshotRequest) (json.RawMessage, error) {
+	return c.post(ctx, "/api/agent/screenshot", req)
 }

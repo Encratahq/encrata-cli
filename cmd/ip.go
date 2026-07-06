@@ -20,7 +20,7 @@ var ipCmd = &cobra.Command{
 		}
 
 		client := api.New(cfg.BaseURL, cfg.APIKey)
-		data, err := client.IPSearch(args[0])
+		data, err := client.IPSearch(cmd.Context(), args[0])
 		if err != nil {
 			output.Error(err.Error())
 			return err

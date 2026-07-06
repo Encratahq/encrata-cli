@@ -37,7 +37,7 @@ var emailCmd = &cobra.Command{
 			Fields:  fields,
 		}
 
-		data, err := client.EmailLookup(req, nocache)
+		data, err := client.EmailLookup(cmd.Context(), req, nocache)
 		if err != nil {
 			output.Error(err.Error())
 			return err

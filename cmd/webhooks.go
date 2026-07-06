@@ -22,7 +22,7 @@ var webhooksLsCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		data, err := client.ListWebhooks()
+		data, err := client.ListWebhooks(cmd.Context())
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -78,7 +78,7 @@ var webhooksCreateCmd = &cobra.Command{
 		}
 		description, _ := cmd.Flags().GetString("description")
 
-		data, err := client.CreateWebhook(&api.WebhookRequest{
+		data, err := client.CreateWebhook(cmd.Context(), &api.WebhookRequest{
 			URL:         args[0],
 			Events:      events,
 			Description: description,
@@ -122,7 +122,7 @@ var webhooksUpdateCmd = &cobra.Command{
 			req.IsActive = &active
 		}
 
-		data, err := client.UpdateWebhook(req)
+		data, err := client.UpdateWebhook(cmd.Context(), req)
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -145,7 +145,7 @@ var webhooksRmCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		data, err := client.DeleteWebhook(args[0])
+		data, err := client.DeleteWebhook(cmd.Context(), args[0])
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -168,7 +168,7 @@ var webhooksTestCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		data, err := client.TestWebhook(args[0])
+		data, err := client.TestWebhook(cmd.Context(), args[0])
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -191,7 +191,7 @@ var webhooksDeliveriesCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		data, err := client.ListWebhookDeliveries(args[0])
+		data, err := client.ListWebhookDeliveries(cmd.Context(), args[0])
 		if err != nil {
 			output.Error(err.Error())
 			return err

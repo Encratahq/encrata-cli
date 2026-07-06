@@ -4,7 +4,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$Repo = "Encratahq/cli"
+$Repo = "Encratahq/encrata-cli"
 $InstallDir = Join-Path $env:LOCALAPPDATA "Programs\Encrata"
 $ExePath = Join-Path $InstallDir "encrata.exe"
 

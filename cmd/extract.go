@@ -46,7 +46,7 @@ var extractCmd = &cobra.Command{
 			req.Timeout = timeout
 		}
 
-		data, err := client.Extract(req)
+		data, err := client.Extract(cmd.Context(), req)
 		if err != nil {
 			output.Error(err.Error())
 			return err
