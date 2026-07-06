@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -262,6 +263,11 @@ func replaceExecutable(exePath string, data []byte) error {
 		return err
 	}
 
+	if runtime.GOOS == "windows" {
+		return replaceExecutableWindows(exePath, tmpPath)
+
+	}
+
 	oldPath := exePath + ".old"
 	_ = os.Remove(oldPath) // clear any leftover from a previous update
 
@@ -276,7 +282,44 @@ func replaceExecutable(exePath string, data []byte) error {
 	}
 
 	// Best-effort cleanup. On Windows the old binary may still be locked while
-
+	// this process runs; it will be removed on the next update.
 	_ = os.Remove(oldPath)
 	return nil
+}
+
+func replaceExecutableWindows(exePath, tmpPath string) error {
+	scriptPath := tmpPath + ".bat"
+	pid := os.Getpid()
+
+	script := fmt.Sprintf(`@echo off
+setlocal
+:wait
+tasklist /FI "PID eq %d" | find "%d" >nul
+if not errorlevel 1 (
+  timeout /T 1 /NOBREAK >nul
+  goto wait
+)
+move /Y %s %s >nul
+del /F /Q %s >nul 2>nul
+del "%%~f0"
+`, pid, pid, quoteBatchArg(tmpPath), quoteBatchArg(exePath), quoteBatchArg(exePath+".old"))
+
+	if err := os.WriteFile(scriptPath, []byte(script), 0o600); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("could not create update script: %w", err)
+	}
+
+	cmd := exec.Command("cmd", "/C", "start", "/B", "", scriptPath)
+	if err := cmd.Start(); err != nil {
+		os.Remove(scriptPath)
+		os.Remove(tmpPath)
+		return fmt.Errorf("could not start update script: %w", err)
+	}
+
+	output.Info("Update will finish after this process exits.")
+	return nil
+}
+
+func quoteBatchArg(s string) string {
+	return strconv.Quote(s)
 }

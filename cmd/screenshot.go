@@ -8,7 +8,9 @@ import (
 
 	"github.com/Encratahq/cli/internal/api"
 	"github.com/Encratahq/cli/internal/output"
+	"github.com/Encratahq/cli/internal/validation"
 	"github.com/spf13/cobra"
+	"path/filepath"
 )
 
 var screenshotCmd = &cobra.Command{
@@ -34,8 +36,13 @@ var screenshotCmd = &cobra.Command{
 		if selector, _ := cmd.Flags().GetString("selector"); selector != "" {
 			req.Selector = selector
 		}
-		if timeout, _ := cmd.Flags().GetInt("timeout"); timeout > 0 {
-			req.Timeout = timeout
+		if timeout, _ := cmd.Flags().GetInt("timeout"); cmd.Flags().Changed("timeout") {
+			if err := validation.Timeout(timeout); err != nil {
+				return err
+			}
+			if timeout > 0 {
+				req.Timeout = timeout
+			}
 		}
 
 		data, err := client.Screenshot(cmd.Context(), req)
@@ -88,13 +95,18 @@ var screenshotCmd = &cobra.Command{
 			}
 			outFile = "screenshot." + ext
 		}
+
+		displayPath := outFile
+		if abs, err := filepath.Abs(outFile); err == nil {
+			displayPath = abs
+		}
 		if err := os.WriteFile(outFile, img, 0o644); err != nil {
 			output.Error(err.Error())
 			return err
 		}
 
 		output.Header("Screenshot: " + result.URL)
-		output.KV("Status", fmt.Sprintf("%d", result.StatusCode), "Format", result.Format, "Saved to", outFile, "Size", fmt.Sprintf("%d bytes", len(img)))
+		output.KV("Status", fmt.Sprintf("%d", result.StatusCode), "Format", result.Format, "Saved to", displayPath, "Size", fmt.Sprintf("%d bytes", len(img)))
 		output.Dim.Printf("  Credits used: %.0f\n", result.Credits)
 		return nil
 	},

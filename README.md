@@ -1,263 +1,583 @@
 # Encrata CLI
 
-Intelligence lookups from your terminal. Encrata CLI brings email enrichment,
-phone intelligence, IP geolocation, domain research, company profiles, Google
-dorking, dark web search, web scraping, screenshots, face recognition, bulk
-operations, monitors, workflows, webhooks, and API key management into one
-command-line tool.
+The official CLI for Encrata.
+
+Built for intelligence lookups, OSINT workflows, automation scripts, and local
+developer testing.
+
+---
 
 ## Install
 
-Choose the install method that fits your environment.
-
-### Windows PowerShell
-
-Recommended for Windows users. This does not require Node.js or npm.
+### PowerShell (Windows)
 
 ```powershell
-irm https://raw.githubusercontent.com/Encratahq/cli/main/install.ps1 | iex
-```
-
-The installer downloads the latest Windows release from GitHub, extracts
-`encrata.exe` to `%LOCALAPPDATA%\Programs\Encrata`, and adds that directory to
-your user `PATH`.
-
-Open a new PowerShell window after installation, then verify:
-
-```powershell
-encrata version
+irm https://raw.githubusercontent.com/Encratahq/encrata-cli/main/install.ps1 | iex
 ```
 
 Install a specific version:
 
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/Encratahq/cli/main/install.ps1))) -Version 0.4.0
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/Encratahq/encrata-cli/main/install.ps1))) -Version 0.4.6
 ```
 
-Update to the latest version by running the same install command again.
-
-### Homebrew
-
-Recommended for macOS users.
+### Homebrew (macOS / Linux)
 
 ```bash
 brew tap Encratahq/tap
 brew install encrata
 ```
 
-Or install directly:
+Or:
 
 ```bash
 brew install Encratahq/tap/encrata
 ```
 
-### npm
-
-Recommended for developers who already use Node.js/npm.
+### Node.js
 
 ```bash
 npm install -g encrata-cli
 ```
 
-The npm package installs a small wrapper that downloads the matching Encrata
-binary for your operating system from GitHub Releases.
+### Manual download
 
-### Manual Download
+Download a binary from the GitHub releases page:
 
-Download prebuilt binaries from
-[GitHub Releases](https://github.com/Encratahq/cli/releases).
+```text
+https://github.com/Encratahq/encrata-cli/releases
+```
 
-Windows users should download the `windows_amd64.zip` or `windows_arm64.zip`
-asset, extract it, and run `encrata.exe`.
+Windows users can download a `windows_amd64.zip` or `windows_arm64.zip` asset,
+extract it, and run `encrata.exe`.
 
-## Setup
+---
+
+## Quickstart
+
+```bash
+# Verify the install
+encrata version
+
+# Save your API key
+encrata config set-key YOUR_API_KEY
+
+# Run your first lookup
+encrata ip 8.8.8.8
+
+# Get the full API response
+encrata company tesla --json
+```
+
+---
+
+## Authentication
+
+The CLI resolves your API key using this priority chain:
+
+| Priority | Source | How to set |
+| -------- | ------ | ---------- |
+| 1 | `--api-key` flag | `encrata ip 8.8.8.8 --api-key YOUR_API_KEY` |
+| 2 | `ENCRATA_API_KEY` env var | `export ENCRATA_API_KEY=YOUR_API_KEY` |
+| 3 | Config file | `encrata config set-key YOUR_API_KEY` |
+
+If no key is found, protected commands return an API key error.
+
+Config is saved to:
+
+```text
+~/.encrata/config.yaml
+```
+
+---
+
+## Configuration
+
+### `encrata config set-key`
+
+Save your API key locally.
 
 ```bash
 encrata config set-key YOUR_API_KEY
 ```
 
-Get your API key at
-[encrata.com/settings/api-keys](https://encrata.com/settings/api-keys).
+### `encrata config set-url`
 
-Verify your install:
+Use a custom API server, for example a local backend.
 
 ```bash
-encrata version
-encrata ip 8.8.8.8
+encrata config set-url http://localhost:8080
 ```
+
+### `encrata config show`
+
+Show the current CLI configuration.
+
+```bash
+encrata config show
+```
+
+### Global options
+
+| Flag | Description |
+| ---- | ----------- |
+| `--json` | Print raw JSON output |
+| `--api-key` | Override the saved API key |
+| `--base-url` | Override the saved API base URL |
+
+---
+
+## Local development
+
+Use this when you want to change the CLI and run your local build.
+
+### Prerequisites
+
+- Go 1.25.4+
+- An Encrata API key
+- Optional: a local Encrata backend running on `http://localhost:8080`
+
+### Setup
+
+1. Clone the repo.
+
+```bash
+git clone https://github.com/Encratahq/encrata-cli.git
+cd encrata-cli
+```
+
+2. Run tests.
+
+```bash
+go test ./...
+```
+
+3. Run the CLI locally.
+
+```bash
+go run . version
+go run . ip 8.8.8.8
+```
+
+4. Point local runs at a local backend.
+
+```powershell
+$env:ENCRATA_BASE_URL = "http://localhost:8080"
+go run . domain google.com
+```
+
+### Build locally
+
+```bash
+go build -o encrata .
+```
+
+On Windows:
+
+```powershell
+go build -o encrata.exe .
+```
+
+Output: `./encrata` or `./encrata.exe`.
+
+---
 
 ## Commands
 
-### Email Lookup
+### `encrata version`
 
-Look up a person by email: name, company, role, socials, breaches, and more.
+Print the installed CLI version.
+
+```bash
+encrata version
+```
+
+---
+
+### `encrata update`
+
+Update the CLI binary to the latest GitHub release.
+
+```bash
+encrata update
+```
+
+---
+
+### `encrata email`
+
+Look up a person or identity by email address. The response can include profile
+data, company data, social links, breach signals, and related metadata.
 
 ```bash
 encrata email user@example.com
+encrata email user@example.com --fields name,company,social_profiles
+encrata email user@example.com --nocache
 encrata email user@example.com --json
-encrata email user@example.com --fields name,company,social_profiles --nocache
 ```
 
-### Phone Lookup
+Options:
 
-Look up a phone number: carrier, format, country, validation, risk, and breach
-data.
+| Flag | Description |
+| ---- | ----------- |
+| `--fields` | Limit the response to specific fields |
+| `--nocache` | Bypass cache and run a fresh lookup |
+| `--country` | Country code hint |
+| `--lang` | Language code hint |
+
+---
+
+### `encrata phone`
+
+Look up a phone number. The response can include carrier, country, normalized
+format, validity, risk, and related intelligence.
 
 ```bash
 encrata phone "+14155552671"
 encrata phone "+447911123456" --json
 ```
 
-### IP Lookup
+---
 
-Look up an IP address: geolocation, ASN, company, and threat detection.
+### `encrata ip`
+
+Look up an IP address. The response can include location, ASN, network owner,
+company, ISP, and threat signals.
 
 ```bash
 encrata ip 8.8.8.8
 encrata ip 2001:4860:4860::8888 --json
 ```
 
-### Domain Search
+---
 
-Investigate a domain: WHOIS, DNS, SSL, threat intelligence, and search results.
+### `encrata domain`
 
-```bash
-encrata domain tesla.com
-```
-
-### Company Search
-
-Find company profiles, employee emails, and knowledge graph data.
+Investigate a domain. The response can include WHOIS, DNS, SSL, risk,
+technology, popularity, URL scan, and related summary data.
 
 ```bash
-encrata company "OpenAI"
+encrata domain google.com
+encrata domain google.com --json
 ```
 
-### Google Search
+---
 
-Run OSINT dorking queries to find exposed files, admin panels, and public info.
+### `encrata company`
+
+Search for company intelligence. Table output summarizes profile data,
+knowledge graph data, top search results, and SEC filings when available.
+
+```bash
+encrata company tesla
+encrata company tesla --json
+```
+
+---
+
+### `encrata google`
+
+Run Google OSINT searches or dorking queries.
 
 ```bash
 encrata google "site:example.com filetype:pdf"
+encrata google "intitle:index.of password"
+encrata google "open source intelligence" --json
 ```
 
-### Dark Web Search
+---
 
-Search dark web intelligence: credential leaks, forum posts, and market
-listings.
+### `encrata darkweb`
+
+Search dark web intelligence for emails, domains, keywords, breach records, and
+onion search results. Enriched results can include LeakCheck breach data and
+darkdump onion search hits.
 
 ```bash
-encrata darkweb "user@example.com" --type email
-encrata darkweb "example.com" --type domain
+encrata darkweb user@example.com
+encrata darkweb example.com
+encrata darkweb "company name" --offset 10
+encrata darkweb user@example.com --json
 ```
 
-### Validate and Breaches
+Options:
 
-Run free email validation and breach checks.
+| Flag | Description |
+| ---- | ----------- |
+| `--offset` | Pagination offset |
+
+---
+
+### `encrata darkweb crawl`
+
+Crawl a `.onion` URL through the dark web crawl endpoint. Use it to check
+whether an onion page is live, collect linked onion URLs, and extract page-level
+emails, phone numbers, titles, and status codes.
+
+```bash
+encrata darkweb crawl http://exampleonionaddress.onion
+encrata darkweb crawl http://exampleonionaddress.onion --depth 2
+encrata darkweb crawl http://exampleonionaddress.onion --depth 3 --force
+encrata darkweb crawl http://exampleonionaddress.onion --json
+```
+
+Options:
+
+| Flag | Description |
+| ---- | ----------- |
+| `--depth` | Crawl depth from 1 to 3. Default is 1 |
+| `--force` | Bypass cache and run a fresh crawl |
+
+---
+
+### `encrata validate`
+
+Validate an email address.
 
 ```bash
 encrata validate user@example.com
-encrata breaches user@example.com
+encrata validate user@example.com --json
 ```
 
-### Scrape
+---
 
-Fetch the raw HTML of a web page. JavaScript rendering is enabled by default.
+### `encrata breaches`
+
+Check whether an email appears in known breach data.
+
+```bash
+encrata breaches user@example.com
+encrata breaches user@example.com --json
+```
+
+---
+
+### `encrata scrape`
+
+Fetch raw HTML from a web page. JavaScript rendering is enabled by default.
 
 ```bash
 encrata scrape https://example.com
 encrata scrape https://example.com -o page.html
-encrata scrape https://example.com --no-js --wait-for "#main"
+encrata scrape https://example.com --no-js
+encrata scrape https://example.com --wait-for "#main"
 ```
 
-### Extract
+Options:
 
-Extract clean markdown, text, or structured data from a web page.
+| Flag | Description |
+| ---- | ----------- |
+| `-o, --output-file` | Write HTML to a file |
+| `--no-js` | Disable JavaScript rendering |
+| `--wait-for` | Wait for a CSS selector |
+| `--timeout` | Timeout in milliseconds |
+
+---
+
+### `encrata extract`
+
+Extract clean page content as markdown, text, or structured selector fields.
 
 ```bash
 encrata extract https://example.com
 encrata extract https://example.com --mode markdown
+encrata extract https://example.com --mode text
 encrata extract https://example.com --selector title=h1 --selector price=.price
 ```
 
-### Screenshot
+Options:
 
-Capture a full-page, viewport, or element screenshot as PNG or JPEG.
+| Flag | Description |
+| ---- | ----------- |
+| `--mode` | `markdown`, `text`, or `selectors` |
+| `--selector` | Field selector as `name=css`; repeatable |
+| `--no-js` | Disable JavaScript rendering |
+| `--timeout` | Timeout in milliseconds |
+
+---
+
+### `encrata screenshot`
+
+Capture a page, viewport, or selected element as PNG or JPEG.
 
 ```bash
 encrata screenshot https://example.com
 encrata screenshot https://example.com -o shot.jpeg --format jpeg
-encrata screenshot https://example.com --viewport --selector "#hero"
+encrata screenshot https://example.com --viewport
+encrata screenshot https://example.com --selector "#hero"
 ```
 
-### Face Search
+Options:
 
-Find matching faces and linked identities from an image URL.
+| Flag | Description |
+| ---- | ----------- |
+| `-o, --output-file` | Output file path |
+| `--format` | `png` or `jpeg` |
+| `--viewport` | Capture only the viewport |
+| `--selector` | Capture one CSS selector |
+| `--timeout` | Timeout in milliseconds |
+
+---
+
+### `encrata face`
+
+Search for matching faces and linked identities from an image URL.
 
 ```bash
 encrata face https://example.com/photo.jpg
 encrata face https://example.com/photo.jpg --threshold 0.8
+encrata face https://example.com/photo.jpg --json
 ```
 
-### Bulk Operations
+Options:
 
-Run batch enrichment and search jobs from arguments or a file.
+| Flag | Description |
+| ---- | ----------- |
+| `--threshold` | Match confidence threshold from 0 to 1 |
+
+---
+
+### `encrata bulk lookup`
+
+Run synchronous bulk email enrichment. Use this for smaller batches where you
+want streamed results in the terminal.
 
 ```bash
 encrata bulk lookup user@example.com admin@example.com
+encrata bulk lookup --file emails.txt
 encrata bulk lookup --file emails.txt --fields name,company
-encrata bulk google --file queries.txt
-encrata bulk company "OpenAI" "Stripe"
-encrata bulk domain example.com encrata.com
-encrata bulk ip 8.8.8.8 1.1.1.1
+encrata bulk lookup --file emails.txt --json
 ```
 
-### Contact Lists
+Options:
 
-Manage reusable target lists for enrichment and monitoring.
+| Flag | Description |
+| ---- | ----------- |
+| `-f, --file` | Read emails from a file |
+| `--fields` | Limit returned fields |
+
+---
+
+### `encrata bulk google`
+
+Run multiple Google OSINT searches.
+
+```bash
+encrata bulk google "open source intelligence" "tesla"
+encrata bulk google --file queries.txt
+encrata bulk google --file queries.txt --json
+```
+
+---
+
+### `encrata bulk company`
+
+Run multiple company lookups.
+
+```bash
+encrata bulk company tesla openai stripe
+encrata bulk company --file companies.txt
+encrata bulk company --file companies.txt --json
+```
+
+---
+
+### `encrata bulk domain`
+
+Run multiple domain lookups.
+
+```bash
+encrata bulk domain example.com encrata.com
+encrata bulk domain --file domains.txt
+encrata bulk domain --file domains.txt --json
+```
+
+---
+
+### `encrata bulk ip`
+
+Run multiple IP lookups.
+
+```bash
+encrata bulk ip 8.8.8.8 1.1.1.1
+encrata bulk ip --file ips.txt
+encrata bulk ip --file ips.txt --json
+```
+
+---
+
+### `encrata jobs`
+
+Manage asynchronous bulk email jobs. Use this for larger files where the backend
+should process the batch in the background and return a downloadable result.
+
+```bash
+encrata jobs create --file emails.txt
+encrata jobs list
+encrata jobs get JOB_ID
+encrata jobs cancel JOB_ID
+```
+
+---
+
+### `encrata lists`
+
+Manage reusable contact lists for enrichment and monitoring.
 
 ```bash
 encrata lists ls
 encrata lists create "Prospects" --type email --targets user@example.com
-encrata lists add LIST_ID user@example.com admin@example.com
+encrata lists get LIST_ID
 encrata lists emails LIST_ID
+encrata lists add LIST_ID user@example.com admin@example.com
 encrata lists remove LIST_ID user@example.com
 encrata lists rm LIST_ID
 ```
 
-### Monitors
+---
 
-Create monitors, trigger runs, and inspect results.
+### `encrata monitors`
+
+Create monitors, trigger runs, and inspect monitor results.
 
 ```bash
 encrata monitors ls
 encrata monitors create "VIP contacts" --emails user@example.com --frequency monthly
 encrata monitors create "List monitor" --list-id LIST_ID --frequency weekly
+encrata monitors get MONITOR_ID
 encrata monitors run MONITOR_ID
 encrata monitors runs MONITOR_ID
+encrata monitors results MONITOR_ID RUN_ID
 encrata monitors results MONITOR_ID RUN_ID --changes-only
 encrata monitors all-runs
+encrata monitors all-results
 ```
 
-### Workflows
+---
 
-Manage automation workflows, runs, templates, and secrets.
+### `encrata workflows`
+
+Manage automation workflows, templates, runs, and workflow secrets.
 
 ```bash
 encrata workflows ls
 encrata workflows templates
 encrata workflows create "Daily enrichment" --template-id TEMPLATE_ID
 encrata workflows create "Custom workflow" --file workflow.json
+encrata workflows get WORKFLOW_ID
 encrata workflows update WORKFLOW_ID --status active
 encrata workflows runs --workflow-id WORKFLOW_ID
 encrata workflows run RUN_ID
-encrata workflows secrets set API_TOKEN secret-value
 encrata workflows secrets ls
+encrata workflows secrets set API_TOKEN secret-value
+encrata workflows secrets rm API_TOKEN
 ```
 
-### Webhooks
+---
 
-Register webhooks and inspect deliveries.
+### `encrata webhooks`
+
+Register webhooks and inspect delivery attempts.
 
 ```bash
 encrata webhooks ls
@@ -268,7 +588,9 @@ encrata webhooks deliveries WEBHOOK_ID
 encrata webhooks rm WEBHOOK_ID
 ```
 
-### API Keys
+---
+
+### `encrata keys`
 
 Create, list, and revoke API keys.
 
@@ -279,49 +601,42 @@ encrata keys revoke KEY_ID
 encrata keys revoke KEY_ID --permanent
 ```
 
-## Global Options
-
-| Flag | Description |
-| ---- | ----------- |
-| `--json` | Output raw JSON |
-| `--api-key` | Override API key for this request |
-| `--base-url` | Override API base URL |
-
-## Configuration
-
-```bash
-encrata config set-key <key>    # Save API key
-encrata config show             # Show current config
-encrata config set-url <url>    # Set custom base URL
-```
-
-Config is stored in `~/.config/encrata/config.json`.
+---
 
 ## Credits
 
+Credit usage depends on the command and whether the backend can serve a cached
+result.
+
 | Command | Credits |
 | ------- | ------- |
-| `email` | 1 credit per lookup; cached within 24 hours free |
+| `email` | 1 credit per lookup; cached results may be free |
 | `phone` | 1 credit per lookup |
 | `domain` | 1 credit |
 | `company` | 1 credit |
 | `google` | 1 credit |
-| `darkweb` | 1 credit for the first page; subsequent pages free |
+| `darkweb` | 1 credit for the first page; pagination may be free |
+| `darkweb crawl` | Depends on crawl depth and cache status |
 | `scrape` | 1 credit per page |
 | `extract` | 1 credit per page |
-| `screenshot` | 1 credit per capture |
+| `screenshot` | Credits depend on capture settings |
 | `face` | 5 credits per search |
-| `bulk` | Credits depend on the operation and number of inputs |
+| `bulk` | Depends on operation and input count |
+| `jobs` | Depends on email count |
 | `ip` | Free |
 | `validate` | Free |
 | `breaches` | Free |
 
+---
+
 ## Links
 
-- [Documentation](https://docs.encrata.com/cli)
-- [API Reference](https://docs.encrata.com/api-reference)
-- [Dashboard](https://encrata.com)
-- [GitHub Releases](https://github.com/Encratahq/cli/releases)
+- Documentation: https://docs.encrata.com/cli
+- API Reference: https://docs.encrata.com/api-reference
+- Dashboard: https://encrata.com
+- Releases: https://github.com/Encratahq/encrata-cli/releases
+
+---
 
 ## License
 

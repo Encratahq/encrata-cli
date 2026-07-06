@@ -7,6 +7,7 @@ import (
 
 	"github.com/Encratahq/cli/internal/api"
 	"github.com/Encratahq/cli/internal/output"
+	"github.com/Encratahq/cli/internal/validation"
 	"github.com/spf13/cobra"
 )
 
@@ -30,8 +31,13 @@ var scrapeCmd = &cobra.Command{
 		if waitFor, _ := cmd.Flags().GetString("wait-for"); waitFor != "" {
 			req.WaitFor = waitFor
 		}
-		if timeout, _ := cmd.Flags().GetInt("timeout"); timeout > 0 {
-			req.Timeout = timeout
+		if timeout, _ := cmd.Flags().GetInt("timeout"); cmd.Flags().Changed("timeout") {
+			if err := validation.Timeout(timeout); err != nil {
+				return err
+			}
+			if timeout > 0 {
+				req.Timeout = timeout
+			}
 		}
 
 		data, err := client.Scrape(cmd.Context(), req)

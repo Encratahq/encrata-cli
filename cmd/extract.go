@@ -7,6 +7,7 @@ import (
 
 	"github.com/Encratahq/cli/internal/api"
 	"github.com/Encratahq/cli/internal/output"
+	"github.com/Encratahq/cli/internal/validation"
 	"github.com/spf13/cobra"
 )
 
@@ -42,8 +43,13 @@ var extractCmd = &cobra.Command{
 			v := false
 			req.RenderJS = &v
 		}
-		if timeout, _ := cmd.Flags().GetInt("timeout"); timeout > 0 {
-			req.Timeout = timeout
+		if timeout, _ := cmd.Flags().GetInt("timeout"); cmd.Flags().Changed("timeout") {
+			if err := validation.Timeout(timeout); err != nil {
+				return err
+			}
+			if timeout > 0 {
+				req.Timeout = timeout
+			}
 		}
 
 		data, err := client.Extract(cmd.Context(), req)

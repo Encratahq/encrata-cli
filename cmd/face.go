@@ -6,6 +6,7 @@ import (
 
 	"github.com/Encratahq/cli/internal/api"
 	"github.com/Encratahq/cli/internal/output"
+	"github.com/Encratahq/cli/internal/validation"
 	"github.com/spf13/cobra"
 )
 
@@ -24,6 +25,9 @@ var faceCmd = &cobra.Command{
 		req := &api.FaceRequest{ImageURL: args[0]}
 		if cmd.Flags().Changed("threshold") {
 			t, _ := cmd.Flags().GetFloat64("threshold")
+			if err := validation.Threshold(t); err != nil {
+				return err
+			}
 			req.Threshold = &t
 		}
 

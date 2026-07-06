@@ -21,12 +21,11 @@ type Config struct {
 }
 
 func Load() *Config {
-	home, _ := os.UserHomeDir()
-	configDir := filepath.Join(home, ".encrata")
-
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath(configDir)
+	if home, err := os.UserHomeDir(); err == nil {
+		viper.AddConfigPath(filepath.Join(home, ".encrata"))
+	}
 	viper.AddConfigPath(".")
 
 	viper.SetDefault("base_url", DefaultBaseURL)

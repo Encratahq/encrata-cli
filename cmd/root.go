@@ -85,6 +85,7 @@ func init() {
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(updateCmd)
+	rootCmd.AddCommand(jobsCmd)
 }
 
 func initConfig() {

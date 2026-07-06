@@ -27,7 +27,10 @@ var setKeyCmd = &cobra.Command{
 		} else {
 			fmt.Print("  Enter API key: ")
 			reader := bufio.NewReader(os.Stdin)
-			input, _ := reader.ReadString('\n')
+			input, err := reader.ReadString('\n')
+			if err != nil {
+				return fmt.Errorf("failed to read API key: %w", err)
+			}
 			key = strings.TrimSpace(input)
 		}
 

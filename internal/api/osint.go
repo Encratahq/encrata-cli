@@ -18,6 +18,16 @@ func (c *Client) GoogleSearch(ctx context.Context, req *GoogleRequest) (json.Raw
 	return c.post(ctx, "/api/agent/google", req)
 }
 
+type DarkwebCrawlRequest struct {
+	URL   string `json:"url"`
+	Depth int    `json:"depth,omitempty"`
+	Force bool   `json:"force,omitempty"`
+}
+
+func (c *Client) DarkwebCrawl(ctx context.Context, req *DarkwebCrawlRequest) (json.RawMessage, error) {
+	return c.post(ctx, "/api/darkweb-crawl", req)
+}
+
 type PhoneRequest struct {
 	Query string `json:"query"`
 }
