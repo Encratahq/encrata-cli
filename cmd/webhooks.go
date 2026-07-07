@@ -14,6 +14,14 @@ var webhooksCmd = &cobra.Command{
 	Short: "Manage webhooks",
 }
 
+var validWebhookEvents = []string{
+	"lookup.completed",
+	"apikey.created",
+	"apikey.revoked",
+	"credits.low",
+	"credits.exhausted",
+}
+
 var webhooksLsCmd = &cobra.Command{
 	Use:   "ls",
 	Short: "List webhooks",
@@ -22,9 +30,10 @@ var webhooksLsCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		spinner := startSpinner("Loading webhooks...")
 		data, err := client.ListWebhooks(cmd.Context())
+		stopSpinner(spinner)
 		if err != nil {
-			output.Error(err.Error())
 			return err
 		}
 		if jsonMode() {
@@ -76,15 +85,19 @@ var webhooksCreateCmd = &cobra.Command{
 		if len(events) == 0 {
 			return fmt.Errorf("at least one --events value is required")
 		}
+		if err := validateWebhookEvents(events); err != nil {
+			return err
+		}
 		description, _ := cmd.Flags().GetString("description")
 
+		spinner := startSpinner("Creating webhook...")
 		data, err := client.CreateWebhook(cmd.Context(), &api.WebhookRequest{
 			URL:         args[0],
 			Events:      events,
 			Description: description,
 		})
+		stopSpinner(spinner)
 		if err != nil {
-			output.Error(err.Error())
 			return err
 		}
 		if jsonMode() {
@@ -113,6 +126,9 @@ var webhooksUpdateCmd = &cobra.Command{
 		req := &api.WebhookRequest{ID: args[0], URL: args[1]}
 		if cmd.Flags().Changed("events") {
 			req.Events, _ = cmd.Flags().GetStringSlice("events")
+			if err := validateWebhookEvents(req.Events); err != nil {
+				return err
+			}
 		}
 		if cmd.Flags().Changed("description") {
 			req.Description, _ = cmd.Flags().GetString("description")
@@ -122,9 +138,10 @@ var webhooksUpdateCmd = &cobra.Command{
 			req.IsActive = &active
 		}
 
+		spinner := startSpinner("Updating webhook...")
 		data, err := client.UpdateWebhook(cmd.Context(), req)
+		stopSpinner(spinner)
 		if err != nil {
-			output.Error(err.Error())
 			return err
 		}
 		if jsonMode() {
@@ -145,9 +162,10 @@ var webhooksRmCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		spinner := startSpinner("Deleting webhook...")
 		data, err := client.DeleteWebhook(cmd.Context(), args[0])
+		stopSpinner(spinner)
 		if err != nil {
-			output.Error(err.Error())
 			return err
 		}
 		if jsonMode() {
@@ -168,9 +186,10 @@ var webhooksTestCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		spinner := startSpinner("Sending test event...")
 		data, err := client.TestWebhook(cmd.Context(), args[0])
+		stopSpinner(spinner)
 		if err != nil {
-			output.Error(err.Error())
 			return err
 		}
 		if jsonMode() {
@@ -191,9 +210,10 @@ var webhooksDeliveriesCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		spinner := startSpinner("Loading webhook deliveries...")
 		data, err := client.ListWebhookDeliveries(cmd.Context(), args[0])
+		stopSpinner(spinner)
 		if err != nil {
-			output.Error(err.Error())
 			return err
 		}
 		if jsonMode() {
@@ -226,12 +246,25 @@ var webhooksDeliveriesCmd = &cobra.Command{
 }
 
 func init() {
-	webhooksCreateCmd.Flags().StringSlice("events", nil, "Event types to subscribe to")
+	webhooksCreateCmd.Flags().StringSlice("events", nil, "Event types to subscribe to: "+strings.Join(validWebhookEvents, ", "))
 	webhooksCreateCmd.Flags().String("description", "", "Webhook description")
 
-	webhooksUpdateCmd.Flags().StringSlice("events", nil, "Event types to subscribe to")
+	webhooksUpdateCmd.Flags().StringSlice("events", nil, "Event types to subscribe to: "+strings.Join(validWebhookEvents, ", "))
 	webhooksUpdateCmd.Flags().String("description", "", "Webhook description")
 	webhooksUpdateCmd.Flags().Bool("active", true, "Whether the webhook is active")
 
 	webhooksCmd.AddCommand(webhooksLsCmd, webhooksCreateCmd, webhooksUpdateCmd, webhooksRmCmd, webhooksTestCmd, webhooksDeliveriesCmd)
+}
+
+func validateWebhookEvents(events []string) error {
+	allowed := make(map[string]bool, len(validWebhookEvents))
+	for _, event := range validWebhookEvents {
+		allowed[event] = true
+	}
+	for _, event := range events {
+		if !allowed[event] {
+			return fmt.Errorf("invalid event type %q. Valid events: %s", event, strings.Join(validWebhookEvents, ", "))
+		}
+	}
+	return nil
 }

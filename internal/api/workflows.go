@@ -19,14 +19,14 @@ type WorkflowUpdateRequest struct {
 	Name        string                   `json:"name,omitempty"`
 	Description string                   `json:"description,omitempty"`
 	Status      string                   `json:"status,omitempty"`
-	Trigger     map[string]interface{}   `json:"trigger,omitempty"`
-	Steps       []map[string]interface{} `json:"steps,omitempty"`
+	Trigger     map[string]interface{}   `json:"trigger"`
+	Steps       []map[string]interface{} `json:"steps"`
 }
 
 func (c *Client) ListWorkflows(ctx context.Context, page, limit int, status string) (json.RawMessage, error) {
 	q := url.Values{}
-	q.Set("page", strconv.Itoa(page))
 	q.Set("limit", strconv.Itoa(limit))
+	q.Set("offset", strconv.Itoa(pageOffset(page, limit)))
 	if status != "" {
 		q.Set("status", status)
 	}
@@ -45,10 +45,14 @@ func (c *Client) GetWorkflow(ctx context.Context, id string) (json.RawMessage, e
 	return c.get(ctx, "/api/workflows/"+url.PathEscape(id), nil)
 }
 
+func (c *Client) TriggerWorkflow(ctx context.Context, id string) (json.RawMessage, error) {
+	return c.post(ctx, "/api/workflows/"+url.PathEscape(id)+"/run", map[string]interface{}{})
+}
+
 func (c *Client) ListWorkflowRuns(ctx context.Context, page, limit int, workflowID string) (json.RawMessage, error) {
 	q := url.Values{}
-	q.Set("page", strconv.Itoa(page))
 	q.Set("limit", strconv.Itoa(limit))
+	q.Set("offset", strconv.Itoa(pageOffset(page, limit)))
 	if workflowID != "" {
 		q.Set("workflow_id", workflowID)
 	}
@@ -71,10 +75,22 @@ func (c *Client) ListWorkflowSecrets(ctx context.Context) (json.RawMessage, erro
 	return c.get(ctx, "/api/workflows/secrets", nil)
 }
 
-func (c *Client) CreateWorkflowSecret(ctx context.Context, name, value string) (json.RawMessage, error) {
-	return c.post(ctx, "/api/workflows/secrets", map[string]string{"name": name, "value": value})
+func (c *Client) CreateWorkflowSecret(ctx context.Context, secretKey, name, value string) (json.RawMessage, error) {
+	return c.post(ctx, "/api/workflows/secrets", map[string]string{"secret_key": secretKey, "name": name, "value": value})
 }
 
-func (c *Client) DeleteWorkflowSecret(ctx context.Context, name string) (json.RawMessage, error) {
-	return c.del(ctx, "/api/workflows/secrets", nil, map[string]string{"name": name})
+func (c *Client) DeleteWorkflowSecret(ctx context.Context, id string) (json.RawMessage, error) {
+	q := url.Values{}
+	q.Set("id", id)
+	return c.del(ctx, "/api/workflows/secrets", q, nil)
+}
+
+func pageOffset(page, limit int) int {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		return 0
+	}
+	return (page - 1) * limit
 }

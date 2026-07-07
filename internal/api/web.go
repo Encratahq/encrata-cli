@@ -27,6 +27,7 @@ type ExtractRequest struct {
 	BlockTrackers *bool             `json:"block_trackers,omitempty"`
 	WaitFor       string            `json:"wait_for,omitempty"`
 	Timeout       int               `json:"timeout,omitempty"`
+	Headers       map[string]string `json:"headers,omitempty"`
 }
 
 func (c *Client) Extract(ctx context.Context, req *ExtractRequest) (json.RawMessage, error) {
@@ -34,15 +35,16 @@ func (c *Client) Extract(ctx context.Context, req *ExtractRequest) (json.RawMess
 }
 
 type ScreenshotRequest struct {
-	URL           string `json:"url"`
-	FullPage      *bool  `json:"full_page,omitempty"`
-	Format        string `json:"format,omitempty"`
-	Selector      string `json:"selector,omitempty"`
-	RenderJS      *bool  `json:"render_js,omitempty"`
-	BlockAds      *bool  `json:"block_ads,omitempty"`
-	BlockTrackers *bool  `json:"block_trackers,omitempty"`
-	WaitFor       string `json:"wait_for,omitempty"`
-	Timeout       int    `json:"timeout,omitempty"`
+	URL           string            `json:"url"`
+	FullPage      *bool             `json:"full_page,omitempty"`
+	Format        string            `json:"format,omitempty"`
+	Selector      string            `json:"selector,omitempty"`
+	RenderJS      *bool             `json:"render_js,omitempty"`
+	BlockAds      *bool             `json:"block_ads,omitempty"`
+	BlockTrackers *bool             `json:"block_trackers,omitempty"`
+	WaitFor       string            `json:"wait_for,omitempty"`
+	Timeout       int               `json:"timeout,omitempty"`
+	Headers       map[string]string `json:"headers,omitempty"`
 }
 
 func (c *Client) Screenshot(ctx context.Context, req *ScreenshotRequest) (json.RawMessage, error) {

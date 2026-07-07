@@ -43,6 +43,24 @@ var extractCmd = &cobra.Command{
 			v := false
 			req.RenderJS = &v
 		}
+		if cmd.Flags().Changed("block-ads") {
+			v, _ := cmd.Flags().GetBool("block-ads")
+			req.BlockAds = &v
+		}
+		if cmd.Flags().Changed("block-trackers") {
+			v, _ := cmd.Flags().GetBool("block-trackers")
+			req.BlockTrackers = &v
+		}
+		if waitFor, _ := cmd.Flags().GetString("wait-for"); waitFor != "" {
+			req.WaitFor = waitFor
+		}
+		if headers, _ := cmd.Flags().GetStringArray("header"); len(headers) > 0 {
+			parsed, err := parseHeaderFlags(headers)
+			if err != nil {
+				return err
+			}
+			req.Headers = parsed
+		}
 		if timeout, _ := cmd.Flags().GetInt("timeout"); cmd.Flags().Changed("timeout") {
 			if err := validation.Timeout(timeout); err != nil {
 				return err
@@ -52,7 +70,9 @@ var extractCmd = &cobra.Command{
 			}
 		}
 
+		spinner := startSpinner("Extracting page...")
 		data, err := client.Extract(cmd.Context(), req)
+		stopSpinner(spinner)
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -108,5 +128,9 @@ func init() {
 	extractCmd.Flags().String("mode", "", "Extraction mode: markdown (default), text, or selectors")
 	extractCmd.Flags().StringSlice("selector", nil, "Field selector as name=css (repeatable)")
 	extractCmd.Flags().Bool("no-js", false, "Disable JavaScript rendering")
+	extractCmd.Flags().Bool("block-ads", false, "Block ads while extracting")
+	extractCmd.Flags().Bool("block-trackers", false, "Block trackers while extracting")
+	extractCmd.Flags().String("wait-for", "", "CSS selector to wait for before extracting")
+	extractCmd.Flags().StringArray("header", nil, "Custom request header as name=value (repeatable)")
 	extractCmd.Flags().Int("timeout", 0, "Timeout in milliseconds (max 60000)")
 }

@@ -18,7 +18,7 @@ irm https://raw.githubusercontent.com/Encratahq/encrata-cli/main/install.ps1 | i
 Install a specific version:
 
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/Encratahq/encrata-cli/main/install.ps1))) -Version 0.4.6
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/Encratahq/encrata-cli/main/install.ps1))) -Version 0.4.7
 ```
 
 ### Homebrew (macOS / Linux)
@@ -127,6 +127,27 @@ encrata config show
 
 ---
 
+## Help
+
+Use help to discover commands, flags, and examples from the terminal.
+
+```bash
+encrata help
+encrata --help
+encrata COMMAND --help
+encrata COMMAND SUBCOMMAND --help
+```
+
+Examples:
+
+```bash
+encrata screenshot --help
+encrata workflows --help
+encrata webhooks create --help
+```
+
+---
+
 ## Local development
 
 Use this when you want to change the CLI and run your local build.
@@ -224,6 +245,8 @@ Options:
 | `--nocache` | Bypass cache and run a fresh lookup |
 | `--country` | Country code hint |
 | `--lang` | Language code hint |
+| `--num` | Number of results |
+| `--page` | Page number |
 
 ---
 
@@ -284,6 +307,16 @@ encrata google "site:example.com filetype:pdf"
 encrata google "intitle:index.of password"
 encrata google "open source intelligence" --json
 ```
+
+Options:
+
+| Flag | Description |
+| ---- | ----------- |
+| `--type` | Search type: `search`, `news`, `images`, `videos`, `scholar`, `places`, `maps`, `shopping`, `patents`, or `autocomplete` |
+| `--country` | Country code hint |
+| `--lang` | Language code hint |
+| `--num` | Number of results |
+| `--page` | Page number |
 
 ---
 
@@ -383,6 +416,9 @@ encrata extract https://example.com
 encrata extract https://example.com --mode markdown
 encrata extract https://example.com --mode text
 encrata extract https://example.com --selector title=h1 --selector price=.price
+encrata extract https://example.com --wait-for "main" --timeout 10000
+encrata extract https://example.com --block-ads --block-trackers
+encrata extract https://example.com --header "User-Agent=EncrataBot/1.0"
 ```
 
 Options:
@@ -392,6 +428,10 @@ Options:
 | `--mode` | `markdown`, `text`, or `selectors` |
 | `--selector` | Field selector as `name=css`; repeatable |
 | `--no-js` | Disable JavaScript rendering |
+| `--block-ads` | Block ads while extracting |
+| `--block-trackers` | Block trackers while extracting |
+| `--wait-for` | Wait for a CSS selector before extraction |
+| `--header` | Custom request header as `name=value`; repeatable |
 | `--timeout` | Timeout in milliseconds |
 
 ---
@@ -405,6 +445,8 @@ encrata screenshot https://example.com
 encrata screenshot https://example.com -o shot.jpeg --format jpeg
 encrata screenshot https://example.com --viewport
 encrata screenshot https://example.com --selector "#hero"
+encrata screenshot https://example.com --wait-for "#hero" --timeout 10000
+encrata screenshot https://example.com --header "User-Agent=EncrataBot/1.0"
 ```
 
 Options:
@@ -415,6 +457,11 @@ Options:
 | `--format` | `png` or `jpeg` |
 | `--viewport` | Capture only the viewport |
 | `--selector` | Capture one CSS selector |
+| `--no-js` | Disable JavaScript rendering |
+| `--block-ads` | Block ads while capturing |
+| `--block-trackers` | Block trackers while capturing |
+| `--wait-for` | Wait for a CSS selector before capture |
+| `--header` | Custom request header as `name=value`; repeatable |
 | `--timeout` | Timeout in milliseconds |
 
 ---
@@ -468,6 +515,12 @@ encrata bulk google --file queries.txt
 encrata bulk google --file queries.txt --json
 ```
 
+Options:
+
+| Flag | Description |
+| ---- | ----------- |
+| `-f, --file` | Read queries from a file |
+
 ---
 
 ### `encrata bulk company`
@@ -479,6 +532,12 @@ encrata bulk company tesla openai stripe
 encrata bulk company --file companies.txt
 encrata bulk company --file companies.txt --json
 ```
+
+Options:
+
+| Flag | Description |
+| ---- | ----------- |
+| `-f, --file` | Read companies from a file |
 
 ---
 
@@ -492,6 +551,12 @@ encrata bulk domain --file domains.txt
 encrata bulk domain --file domains.txt --json
 ```
 
+Options:
+
+| Flag | Description |
+| ---- | ----------- |
+| `-f, --file` | Read domains from a file |
+
 ---
 
 ### `encrata bulk ip`
@@ -503,6 +568,12 @@ encrata bulk ip 8.8.8.8 1.1.1.1
 encrata bulk ip --file ips.txt
 encrata bulk ip --file ips.txt --json
 ```
+
+Options:
+
+| Flag | Description |
+| ---- | ----------- |
+| `-f, --file` | Read IP addresses from a file |
 
 ---
 
@@ -517,6 +588,12 @@ encrata jobs list
 encrata jobs get JOB_ID
 encrata jobs cancel JOB_ID
 ```
+
+Options:
+
+| Flag | Description |
+| ---- | ----------- |
+| `-f, --file` | Read emails from a file when creating a job |
 
 ---
 
@@ -533,6 +610,13 @@ encrata lists add LIST_ID user@example.com admin@example.com
 encrata lists remove LIST_ID user@example.com
 encrata lists rm LIST_ID
 ```
+
+Options:
+
+| Flag | Description |
+| ---- | ----------- |
+| `--type` | Filter lists by type on `ls`, or set the list type on `create` |
+| `--targets` | Initial targets to add when creating a list |
 
 ---
 
@@ -553,6 +637,18 @@ encrata monitors all-runs
 encrata monitors all-results
 ```
 
+Options:
+
+| Flag | Description |
+| ---- | ----------- |
+| `--emails` | Emails to monitor when creating a monitor |
+| `--list-id` | Contact list ID to use as the monitor data source |
+| `--frequency` | Monitor frequency: `weekly`, `biweekly`, `monthly`, or `quarterly` |
+| `--change-detection` | Change detection mode: `diff_only` or `full_refresh` |
+| `--changes-only` | Only show records with changes |
+| `--limit` | Results per page |
+| `--offset` | Result offset |
+
 ---
 
 ### `encrata workflows`
@@ -562,16 +658,38 @@ Manage automation workflows, templates, runs, and workflow secrets.
 ```bash
 encrata workflows ls
 encrata workflows templates
+encrata workflows templates --category monitoring
 encrata workflows create "Daily enrichment" --template-id TEMPLATE_ID
 encrata workflows create "Custom workflow" --file workflow.json
 encrata workflows get WORKFLOW_ID
 encrata workflows update WORKFLOW_ID --status active
+encrata workflows test WORKFLOW_ID
 encrata workflows runs --workflow-id WORKFLOW_ID
+encrata workflows runs --workflow-id WORKFLOW_ID --page 2 --limit 20
 encrata workflows run RUN_ID
 encrata workflows secrets ls
 encrata workflows secrets set API_TOKEN secret-value
-encrata workflows secrets rm API_TOKEN
+encrata workflows secrets set API_TOKEN secret-value --name "Production API token"
+encrata workflows secrets rm SECRET_ID
 ```
+
+Workflow templates are reusable starting points for common automations. Use
+`encrata workflows templates` to list available templates, then pass a template
+ID to `encrata workflows create --template-id`.
+
+Options:
+
+| Flag | Description |
+| ---- | ----------- |
+| `--status` | Filter workflows by status on `ls`, or set status on `update` |
+| `--description` | Workflow description on `create` or `update` |
+| `--template-id` | Create a workflow from a template |
+| `-f, --file` | JSON file with trigger and steps for `create` or `update` |
+| `--name` | New workflow name on `update`, or display name when setting a workflow secret |
+| `--category` | Filter templates by category |
+| `--workflow-id` | Filter runs by workflow ID |
+| `--page` | Page number for workflow and run lists |
+| `--limit` | Results per page for workflow and run lists |
 
 ---
 
@@ -581,12 +699,30 @@ Register webhooks and inspect delivery attempts.
 
 ```bash
 encrata webhooks ls
-encrata webhooks create https://example.com/hook --events workflow.completed
+encrata webhooks create https://example.com/hook --events lookup.completed
 encrata webhooks update WEBHOOK_ID https://example.com/new-hook --active=false
 encrata webhooks test WEBHOOK_ID
 encrata webhooks deliveries WEBHOOK_ID
 encrata webhooks rm WEBHOOK_ID
 ```
+
+Options:
+
+| Flag | Description |
+| ---- | ----------- |
+| `--events` | Event types to subscribe to |
+| `--description` | Webhook description |
+| `--active` | Whether the webhook is active when updating |
+
+Valid events:
+
+| Event | Description |
+| ----- | ----------- |
+| `lookup.completed` | A lookup finished and can be delivered to the webhook |
+| `apikey.created` | An API key was created |
+| `apikey.revoked` | An API key was revoked |
+| `credits.low` | Account credits are low |
+| `credits.exhausted` | Account credits are exhausted |
 
 ---
 

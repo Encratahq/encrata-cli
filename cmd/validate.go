@@ -16,7 +16,9 @@ var validateCmd = &cobra.Command{
 			return err
 		}
 
+		spinner := startSpinner("Validating email...")
 		data, err := client.Validate(cmd.Context(), args[0])
+		stopSpinner(spinner)
 		if err != nil {
 			output.Error(err.Error())
 			return err

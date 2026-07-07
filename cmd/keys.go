@@ -20,7 +20,9 @@ var keysLsCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		spinner := startSpinner("Loading API keys...")
 		data, err := client.ListKeys(cmd.Context())
+		stopSpinner(spinner)
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -62,7 +64,9 @@ var keysCreateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		spinner := startSpinner("Creating API key...")
 		data, err := client.CreateKey(cmd.Context(), args[0])
+		stopSpinner(spinner)
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -91,7 +95,9 @@ var keysRevokeCmd = &cobra.Command{
 			return err
 		}
 		permanent, _ := cmd.Flags().GetBool("permanent")
+		spinner := startSpinner("Revoking API key...")
 		data, err := client.RevokeKey(cmd.Context(), args[0], permanent)
+		stopSpinner(spinner)
 		if err != nil {
 			output.Error(err.Error())
 			return err

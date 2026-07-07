@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/Encratahq/cli/internal/api"
 	"github.com/Encratahq/cli/internal/output"
 	"github.com/Encratahq/cli/internal/validation"
 	"github.com/spf13/cobra"
-	"path/filepath"
 )
 
 var screenshotCmd = &cobra.Command{
@@ -36,6 +37,28 @@ var screenshotCmd = &cobra.Command{
 		if selector, _ := cmd.Flags().GetString("selector"); selector != "" {
 			req.Selector = selector
 		}
+		if cmd.Flags().Changed("no-js") {
+			v := false
+			req.RenderJS = &v
+		}
+		if cmd.Flags().Changed("block-ads") {
+			v, _ := cmd.Flags().GetBool("block-ads")
+			req.BlockAds = &v
+		}
+		if cmd.Flags().Changed("block-trackers") {
+			v, _ := cmd.Flags().GetBool("block-trackers")
+			req.BlockTrackers = &v
+		}
+		if waitFor, _ := cmd.Flags().GetString("wait-for"); waitFor != "" {
+			req.WaitFor = waitFor
+		}
+		if headers, _ := cmd.Flags().GetStringArray("header"); len(headers) > 0 {
+			parsed, err := parseHeaderFlags(headers)
+			if err != nil {
+				return err
+			}
+			req.Headers = parsed
+		}
 		if timeout, _ := cmd.Flags().GetInt("timeout"); cmd.Flags().Changed("timeout") {
 			if err := validation.Timeout(timeout); err != nil {
 				return err
@@ -45,9 +68,10 @@ var screenshotCmd = &cobra.Command{
 			}
 		}
 
+		spinner := startSpinner("Capturing screenshot...")
 		data, err := client.Screenshot(cmd.Context(), req)
+		stopSpinner(spinner)
 		if err != nil {
-			output.Error(err.Error())
 			return err
 		}
 
@@ -116,6 +140,24 @@ func init() {
 	screenshotCmd.Flags().String("format", "", "Image format: png (default) or jpeg")
 	screenshotCmd.Flags().Bool("viewport", false, "Capture only the viewport instead of the full page")
 	screenshotCmd.Flags().String("selector", "", "CSS selector to capture only a specific element")
+	screenshotCmd.Flags().Bool("no-js", false, "Disable JavaScript rendering")
+	screenshotCmd.Flags().Bool("block-ads", false, "Block ads while capturing")
+	screenshotCmd.Flags().Bool("block-trackers", false, "Block trackers while capturing")
+	screenshotCmd.Flags().String("wait-for", "", "CSS selector to wait for before capturing")
+	screenshotCmd.Flags().StringArray("header", nil, "Custom request header as name=value (repeatable)")
 	screenshotCmd.Flags().Int("timeout", 0, "Timeout in milliseconds (max 60000)")
 	screenshotCmd.Flags().StringP("output-file", "o", "", "Output file path (default screenshot.<format>)")
+}
+
+func parseHeaderFlags(values []string) (map[string]string, error) {
+	headers := make(map[string]string, len(values))
+	for _, value := range values {
+		name, headerValue, ok := strings.Cut(value, "=")
+		name = strings.TrimSpace(name)
+		if !ok || name == "" {
+			return nil, fmt.Errorf("invalid header %q, expected name=value", value)
+		}
+		headers[name] = strings.TrimSpace(headerValue)
+	}
+	return headers, nil
 }

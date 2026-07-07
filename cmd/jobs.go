@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/Encratahq/cli/internal/output"
 	"github.com/spf13/cobra"
@@ -26,8 +27,13 @@ var jobsCreateCmd = &cobra.Command{
 			return err
 		}
 
+		spinner := startSpinner("Creating bulk job...")
 		data, err := client.CreateBulkJob(cmd.Context(), emails)
+		stopSpinner(spinner)
 		if err != nil {
+			if strings.Contains(strings.ToLower(err.Error()), "no valid email") {
+				return fmt.Errorf("jobs create only supports email files. No valid email addresses found. For IP bulk lookups, use: encrata bulk ip --file <file>")
+			}
 			return err
 		}
 
@@ -60,7 +66,9 @@ var jobsListCmd = &cobra.Command{
 			return err
 		}
 
+		spinner := startSpinner("Loading bulk jobs...")
 		data, err := client.ListBulkJobs(cmd.Context())
+		stopSpinner(spinner)
 		if err != nil {
 			return err
 		}
@@ -102,7 +110,9 @@ var jobsGetCmd = &cobra.Command{
 			return err
 		}
 
+		spinner := startSpinner("Loading bulk job...")
 		data, err := client.GetBulkJob(cmd.Context(), args[0])
+		stopSpinner(spinner)
 		if err != nil {
 			return err
 		}
@@ -130,7 +140,7 @@ var jobsGetCmd = &cobra.Command{
 			"Credits", fmt.Sprintf("%d", getInt(resp.Job, "credits_used")),
 		)
 		if resp.DownloadURL != "" {
-			output.KV("Download", resp.DownloadURL)
+			output.KV("Download", terminalLink("open results", resp.DownloadURL))
 		}
 		return nil
 	},
@@ -146,7 +156,9 @@ var jobsCancelCmd = &cobra.Command{
 			return err
 		}
 
+		spinner := startSpinner("Cancelling bulk job...")
 		data, err := client.CancelBulkJob(cmd.Context(), args[0])
+		stopSpinner(spinner)
 		if err != nil {
 			return err
 		}
@@ -167,4 +179,8 @@ func init() {
 	jobsCmd.AddCommand(jobsListCmd)
 	jobsCmd.AddCommand(jobsGetCmd)
 	jobsCmd.AddCommand(jobsCancelCmd)
+}
+
+func terminalLink(label, url string) string {
+	return fmt.Sprintf("\x1b]8;;%s\x1b\\%s\x1b]8;;\x1b\\", url, label)
 }

@@ -19,7 +19,9 @@ var breachesCmd = &cobra.Command{
 			return err
 		}
 
+		spinner := startSpinner("Checking breaches...")
 		data, err := client.Breaches(cmd.Context(), args[0])
+		stopSpinner(spinner)
 		if err != nil {
 			output.Error(err.Error())
 			return err

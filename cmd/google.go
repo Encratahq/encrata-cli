@@ -36,7 +36,9 @@ var googleCmd = &cobra.Command{
 			Page:    page,
 		}
 
+		spinner := startSpinner("Searching Google...")
 		data, err := client.GoogleSearch(cmd.Context(), req)
+		stopSpinner(spinner)
 		if err != nil {
 			output.Error(err.Error())
 			return err

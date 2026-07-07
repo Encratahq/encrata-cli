@@ -20,7 +20,9 @@ var phoneCmd = &cobra.Command{
 		}
 
 		client := api.New(cfg.BaseURL, cfg.APIKey)
+		spinner := startSpinner("Looking up phone...")
 		data, err := client.PhoneSearch(cmd.Context(), args[0])
+		stopSpinner(spinner)
 		if err != nil {
 			output.Error(err.Error())
 			return err

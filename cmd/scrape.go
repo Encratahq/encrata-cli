@@ -40,7 +40,9 @@ var scrapeCmd = &cobra.Command{
 			}
 		}
 
+		spinner := startSpinner("Scraping page...")
 		data, err := client.Scrape(cmd.Context(), req)
+		stopSpinner(spinner)
 		if err != nil {
 			output.Error(err.Error())
 			return err

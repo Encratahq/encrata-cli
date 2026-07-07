@@ -31,7 +31,9 @@ var faceCmd = &cobra.Command{
 			req.Threshold = &t
 		}
 
+		spinner := startSpinner("Searching faces...")
 		data, err := client.FaceSearch(cmd.Context(), req)
+		stopSpinner(spinner)
 		if err != nil {
 			output.Error(err.Error())
 			return err

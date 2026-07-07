@@ -22,7 +22,9 @@ var listsLsCmd = &cobra.Command{
 			return err
 		}
 		listType, _ := cmd.Flags().GetString("type")
+		spinner := startSpinner("Loading lists...")
 		data, err := client.ListContactLists(cmd.Context(), listType)
+		stopSpinner(spinner)
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -68,11 +70,13 @@ var listsCreateCmd = &cobra.Command{
 		listType, _ := cmd.Flags().GetString("type")
 		targets, _ := cmd.Flags().GetStringSlice("targets")
 
+		spinner := startSpinner("Creating list...")
 		data, err := client.CreateContactList(cmd.Context(), &api.ListCreateRequest{
 			Name:    args[0],
 			Type:    listType,
 			Targets: targets,
 		})
+		stopSpinner(spinner)
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -106,7 +110,9 @@ var listsRmCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		spinner := startSpinner("Deleting list...")
 		data, err := client.DeleteContactList(cmd.Context(), args[0])
+		stopSpinner(spinner)
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -129,7 +135,9 @@ var listsEmailsCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		spinner := startSpinner("Loading list emails...")
 		data, err := client.ListContactListEmails(cmd.Context(), args[0])
+		stopSpinner(spinner)
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -164,7 +172,9 @@ var listsAddCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		spinner := startSpinner("Adding emails...")
 		data, err := client.AddContactListEmails(cmd.Context(), args[0], args[1:])
+		stopSpinner(spinner)
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -190,7 +200,9 @@ var listsRemoveCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		spinner := startSpinner("Removing emails...")
 		data, err := client.DeleteContactListEmails(cmd.Context(), args[0], args[1:])
+		stopSpinner(spinner)
 		if err != nil {
 			output.Error(err.Error())
 			return err

@@ -94,7 +94,7 @@ func TestBulkLookupFromFileUsesSSEServer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("bulk lookup failed: %v\n%s", err, out)
 	}
-	for _, want := range []string{"Bulk Lookup: 2 email(s)", "one@example.com", "two@example.com", "2 result(s)"} {
+	for _, want := range []string{"Bulk Lookup: 2 emails", "one@example.com", "two@example.com", "2 results"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("expected output to contain %q, got:\n%s", want, out)
 		}

@@ -21,7 +21,9 @@ var monitorsLsCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		spinner := startSpinner("Loading monitors...")
 		data, err := client.ListMonitors(cmd.Context())
+		stopSpinner(spinner)
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -80,7 +82,9 @@ var monitorsCreateCmd = &cobra.Command{
 			req.DataSourceRef = listID
 		}
 
+		spinner := startSpinner("Creating monitor...")
 		data, err := client.CreateMonitor(cmd.Context(), req)
+		stopSpinner(spinner)
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -114,7 +118,9 @@ var monitorsRunCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		spinner := startSpinner("Triggering monitor run...")
 		data, err := client.TriggerMonitorRun(cmd.Context(), args[0])
+		stopSpinner(spinner)
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -143,7 +149,9 @@ var monitorsRunsCmd = &cobra.Command{
 		}
 		limit, _ := cmd.Flags().GetInt("limit")
 		offset, _ := cmd.Flags().GetInt("offset")
+		spinner := startSpinner("Loading monitor runs...")
 		data, err := client.ListMonitorRuns(cmd.Context(), args[0], limit, offset)
+		stopSpinner(spinner)
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -189,7 +197,9 @@ var monitorsResultsCmd = &cobra.Command{
 		changesOnly, _ := cmd.Flags().GetBool("changes-only")
 		limit, _ := cmd.Flags().GetInt("limit")
 		offset, _ := cmd.Flags().GetInt("offset")
+		spinner := startSpinner("Loading monitor results...")
 		data, err := client.GetMonitorRunResults(cmd.Context(), args[0], args[1], changesOnly, limit, offset)
+		stopSpinner(spinner)
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -209,7 +219,9 @@ var monitorsAllRunsCmd = &cobra.Command{
 		}
 		limit, _ := cmd.Flags().GetInt("limit")
 		offset, _ := cmd.Flags().GetInt("offset")
+		spinner := startSpinner("Loading monitor runs...")
 		data, err := client.ListAllMonitorRuns(cmd.Context(), limit, offset)
+		stopSpinner(spinner)
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -254,7 +266,9 @@ var monitorsAllResultsCmd = &cobra.Command{
 		changesOnly, _ := cmd.Flags().GetBool("changes-only")
 		limit, _ := cmd.Flags().GetInt("limit")
 		offset, _ := cmd.Flags().GetInt("offset")
+		spinner := startSpinner("Loading monitor results...")
 		data, err := client.ListAllMonitorResults(cmd.Context(), changesOnly, limit, offset)
+		stopSpinner(spinner)
 		if err != nil {
 			output.Error(err.Error())
 			return err

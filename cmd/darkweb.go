@@ -29,7 +29,9 @@ var darkwebCmd = &cobra.Command{
 			Offset: offset,
 		}
 
+		spinner := startSpinner("Searching dark web...")
 		data, err := client.DarkwebSearch(cmd.Context(), req)
+		stopSpinner(spinner)
 		if err != nil {
 			output.Error(err.Error())
 			return err
@@ -143,7 +145,9 @@ var darkwebCrawlCmd = &cobra.Command{
 			Force: force,
 		}
 
+		spinner := startSpinner("Crawling onion site...")
 		data, err := client.DarkwebCrawl(cmd.Context(), req)
+		stopSpinner(spinner)
 		if err != nil {
 			return err
 		}

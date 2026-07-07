@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+var lastError string
+
 // brandColor prints text in 256-color terracotta (closest to #cc785c)
 func brandColor(s string) string {
 	return fmt.Sprintf("\033[38;5;173m%s\033[0m", s)
@@ -54,7 +56,8 @@ func Table(headers []string, rows [][]string) {
 	// Print header
 	fmt.Print("  ")
 	for i, h := range headers {
-		fmt.Fprintf(os.Stdout, "%-*s", widths[i]+3, brandBold(h))
+		fmt.Fprint(os.Stdout, brandBold(h))
+		fmt.Fprint(os.Stdout, strings.Repeat(" ", widths[i]-len(h)+3))
 	}
 	fmt.Println()
 	// Separator
@@ -96,6 +99,10 @@ func KV(pairs ...string) {
 }
 
 func Error(msg string) {
+	if msg == lastError {
+		return
+	}
+	lastError = msg
 	fmt.Fprintf(os.Stderr, "  %s %s\n", "\033[1;31m✗\033[0m", msg)
 }
 
@@ -105,7 +112,7 @@ func Info(msg string) {
 
 func Header(title string) {
 	fmt.Println()
-	fmt.Printf("  %s %s\n", brandColor("━━"), brandBold(title))
+	fmt.Printf("  %s\n", brandBold(title))
 	fmt.Println()
 }
 
@@ -147,6 +154,8 @@ func (p Printer) Sprintf(format string, a ...interface{}) string {
 
 // Package-level styled printers
 var (
+	Brand   = Printer{style: brandColor}
+	Accent  = Printer{style: accentColor}
 	Bold    = Printer{style: func(s string) string { return fmt.Sprintf("\033[1m%s\033[0m", s) }}
 	Dim     = Printer{style: mutedColor}
 	Warn    = Printer{style: func(s string) string { return fmt.Sprintf("\033[1;33m%s\033[0m", s) }}

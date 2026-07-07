@@ -34,7 +34,7 @@ var bulkLookupCmd = &cobra.Command{
 
 		asJSON := jsonMode()
 		if !asJSON {
-			output.Header(fmt.Sprintf("Bulk Lookup: %d email(s)", len(emails)))
+			output.Header(fmt.Sprintf("Bulk Lookup: %d %s", len(emails), plural(len(emails), "email", "emails")))
 		}
 
 		count := 0
@@ -57,7 +57,7 @@ var bulkLookupCmd = &cobra.Command{
 
 		if !asJSON {
 			fmt.Println()
-			output.Dim.Printf("  %d result(s)\n", count)
+			output.Dim.Printf("  %d %s\n", count, plural(count, "result", "results"))
 		}
 		return nil
 	},
@@ -80,7 +80,9 @@ func bulkSearchCmd(
 			if err != nil {
 				return err
 			}
+			spinner := startSpinner("Running bulk request...")
 			data, err := fn(client, cmd.Context(), queries)
+			stopSpinner(spinner)
 			if err != nil {
 				return err
 			}
@@ -100,7 +102,7 @@ func renderBulkCompanies(data json.RawMessage) error {
 		return nil
 	}
 
-	output.Header(fmt.Sprintf("Bulk Company: %d result(s)", len(results)))
+	output.Header(fmt.Sprintf("Bulk Company: %d %s", len(results), plural(len(results), "result", "results")))
 
 	totalCredits := 0.0
 	for i, item := range results {
@@ -159,9 +161,12 @@ func renderBulkSummaries(title string, data json.RawMessage) error {
 		return nil
 	}
 
-	output.Header(fmt.Sprintf("%s: %d result(s)", title, len(results)))
+	output.Header(fmt.Sprintf("%s: %d %s", title, len(results), plural(len(results), "result", "results")))
 
+	totalCredits := 0.0
 	for i, item := range results {
+		totalCredits += getFloat(item, "credits")
+
 		query := getStr(item, "query")
 		if query == "" {
 			query = fmt.Sprintf("Result %d", i+1)
@@ -179,6 +184,7 @@ func renderBulkSummaries(title string, data json.RawMessage) error {
 		fmt.Println()
 	}
 
+	output.Dim.Printf("  Total credits used: %.0f\n", totalCredits)
 	return nil
 }
 
@@ -239,7 +245,7 @@ func printBulkIPSummary(item map[string]interface{}) {
 		if code := getStr(loc, "country_code"); code != "" {
 			country = fmt.Sprintf("%s (%s)", country, code)
 		}
-		output.KV(
+		printNonEmptyKV(
 			"City", getStr(loc, "city"),
 			"Region", getStr(loc, "region"),
 			"Country", country,
@@ -253,26 +259,36 @@ func printBulkIPSummary(item map[string]interface{}) {
 		if number > 0 {
 			asnLabel = fmt.Sprintf("AS%.0f", number)
 		}
-		output.Bold.Println("    Network:")
-		output.KV(
-			"ASN", asnLabel,
-			"Org", getStr(asn, "org"),
-			"ISP", getStr(asn, "isp"),
-			"Type", getStr(asn, "type"),
-		)
+		org := getStr(asn, "org")
+		isp := getStr(asn, "isp")
+		asnType := getStr(asn, "type")
+		if firstNonEmpty(asnLabel, org, isp, asnType) != "" {
+			output.Bold.Println("  Network:")
+			printNonEmptyKV(
+				"ASN", asnLabel,
+				"Org", org,
+				"ISP", isp,
+				"Type", asnType,
+			)
+		}
 	}
 
 	if company, ok := item["company"].(map[string]interface{}); ok {
-		output.Bold.Println("    Company:")
-		output.KV(
-			"Name", getStr(company, "name"),
-			"Domain", getStr(company, "domain"),
-			"Type", getStr(company, "type"),
-		)
+		name := getStr(company, "name")
+		domain := getStr(company, "domain")
+		companyType := getStr(company, "type")
+		if firstNonEmpty(name, domain, companyType) != "" {
+			output.Bold.Println("  Company:")
+			printNonEmptyKV(
+				"Name", name,
+				"Domain", domain,
+				"Type", companyType,
+			)
+		}
 	}
 
 	if threat, ok := item["threat"].(map[string]interface{}); ok {
-		output.Bold.Println("    Threat Assessment:")
+		output.Bold.Println("  Threat Assessment:")
 		for _, row := range []struct {
 			label string
 			key   string
@@ -283,7 +299,7 @@ func printBulkIPSummary(item map[string]interface{}) {
 			{"Abuser", "is_abuser"},
 			{"Bot", "is_bot"},
 		} {
-			fmt.Printf("      %-8s %s\n", row.label, yesNo(getBool(threat, row.key)))
+			fmt.Printf("    %-8s %s\n", row.label, yesNo(getBool(threat, row.key)))
 		}
 	}
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/Encratahq/cli/internal/api"
 	"github.com/Encratahq/cli/internal/output"
+	"github.com/Encratahq/cli/internal/validation"
 	"github.com/spf13/cobra"
 )
 
@@ -15,12 +16,17 @@ var ipCmd = &cobra.Command{
 	Long:  "Retrieve geolocation, ASN, company, and threat data for an IP address.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := validation.IP(args[0]); err != nil {
+			return friendlyFormatError(cmd, err.Error())
+		}
 		if err := cfg.Validate(); err != nil {
 			return err
 		}
 
 		client := api.New(cfg.BaseURL, cfg.APIKey)
+		spinner := startSpinner("Looking up IP...")
 		data, err := client.IPSearch(cmd.Context(), args[0])
+		stopSpinner(spinner)
 		if err != nil {
 			output.Error(err.Error())
 			return err

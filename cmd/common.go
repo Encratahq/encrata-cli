@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 
@@ -31,6 +32,84 @@ func decode(data json.RawMessage, v interface{}) bool {
 		return false
 	}
 	return true
+}
+
+func plural(count int, singular, plural string) string {
+	if count == 1 {
+		return singular
+	}
+	return plural
+}
+
+func improveArgErrors(cmd *cobra.Command) {
+	for _, child := range cmd.Commands() {
+		improveArgErrors(child)
+	}
+	if cmd.Args == nil {
+		return
+	}
+
+	original := cmd.Args
+	cmd.Args = func(cmd *cobra.Command, args []string) error {
+		err := original(cmd, args)
+		if err == nil || !isCobraArgError(err) {
+			return err
+		}
+		return friendlyArgError(cmd, args)
+	}
+}
+
+func isCobraArgError(err error) bool {
+	message := err.Error()
+	return strings.Contains(message, "accepts ") ||
+		strings.Contains(message, "requires at least ") ||
+		strings.Contains(message, "requires no arguments")
+}
+
+func friendlyArgError(cmd *cobra.Command, args []string) error {
+	usage := strings.TrimSpace(cmd.UseLine())
+	if usage == "" {
+		usage = cmd.CommandPath()
+	}
+	usage = themedUsage(usage, cmd.CommandPath())
+	help := fmt.Sprintf("%s %s", output.Dim.Sprint("Try"), output.Accent.Sprintf("%s --help", cmd.CommandPath()))
+
+	if len(args) == 0 {
+		return fmt.Errorf("%s\n\n%s\n  %s\n\n%s", output.Bold.Sprintf("missing %s", requiredInputName(cmd)), output.Dim.Sprint("Usage"), usage, help)
+	}
+
+	return fmt.Errorf("%s\n\n%s\n  %s\n\n%s", output.Bold.Sprint("wrong input format"), output.Dim.Sprint("Usage"), usage, help)
+}
+
+func friendlyFormatError(cmd *cobra.Command, message string) error {
+	usage := strings.TrimSpace(cmd.UseLine())
+	if usage == "" {
+		usage = cmd.CommandPath()
+	}
+	usage = themedUsage(usage, cmd.CommandPath())
+	help := fmt.Sprintf("%s %s", output.Dim.Sprint("Try"), output.Accent.Sprintf("%s --help", cmd.CommandPath()))
+
+	return fmt.Errorf("%s\n\n%s\n  %s\n\n%s", output.Bold.Sprint(message), output.Dim.Sprint("Format"), usage, help)
+}
+
+func themedUsage(usage, commandPath string) string {
+	if commandPath == "" {
+		return usage
+	}
+	return strings.Replace(usage, commandPath, output.Brand.Sprint(commandPath), 1)
+}
+
+func requiredInputName(cmd *cobra.Command) string {
+	for _, field := range strings.Fields(cmd.Use) {
+		if strings.HasPrefix(field, "[") && strings.HasSuffix(field, "]") {
+			name := strings.Trim(field, "[]")
+			name = strings.TrimSuffix(name, "...")
+			if name != "" {
+				return name
+			}
+		}
+	}
+	return "required input"
 }
 
 // readLines reads non-empty trimmed lines from a file.
@@ -94,7 +173,9 @@ func simpleGet(fn func(*api.Client, context.Context, string) (json.RawMessage, e
 		if err != nil {
 			return err
 		}
+		spinner := startSpinner("Loading details...")
 		data, err := fn(client, cmd.Context(), args[0])
+		stopSpinner(spinner)
 		if err != nil {
 			output.Error(err.Error())
 			return err
