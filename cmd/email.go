@@ -38,6 +38,17 @@ func init() {
 		emailVerifyCmd,
 		emailBulkCmd,
 	)
+
+	// Single-email commands can write the full JSON payload to a file.
+	for _, c := range []*cobra.Command{
+		emailValidityCmd,
+		emailEnrichCmd,
+		emailIdentityCmd,
+		emailBreachesCmd,
+		emailVerifyCmd,
+	} {
+		c.Flags().String("out", "", "Write the full JSON result to a file")
+	}
 }
 
 // emailLookup runs a single-email API call and renders the result, mirroring the
@@ -66,8 +77,13 @@ func emailLookup(
 		return err
 	}
 
+	out, _ := cmd.Flags().GetString("out")
+
 	if jsonMode() {
 		output.JSON(data)
+		if out != "" {
+			return saveResult(out, data)
+		}
 		return nil
 	}
 
@@ -82,6 +98,9 @@ func emailLookup(
 		footer(result)
 	} else {
 		printCredits(result)
+	}
+	if out != "" {
+		return saveResult(out, data)
 	}
 	return nil
 }

@@ -2,6 +2,7 @@ package output
 
 import (
 	"fmt"
+	"os"
 	"sync"
 	"time"
 )
@@ -33,10 +34,10 @@ func (s *Spinner) Start() {
 		for {
 			select {
 			case <-s.stop:
-				fmt.Print("\r\033[K")
+				fmt.Fprint(os.Stderr, "\r\033[K")
 				return
 			case <-ticker.C:
-				fmt.Printf("\r  %s %s", brandColor(frames[i%len(frames)]), mutedColor(s.message))
+				fmt.Fprintf(os.Stderr, "\r  %s %s", brandColor(frames[i%len(frames)]), mutedColor(s.message))
 				i++
 			}
 		}

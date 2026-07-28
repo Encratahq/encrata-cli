@@ -124,6 +124,12 @@ func SuccessMsg(msg string) {
 	fmt.Printf("  %s %s\n", "\033[1;32m✓\033[0m", msg)
 }
 
+// SavedPath prints a "Result saved to" confirmation to STDERR so it never
+// corrupts JSON written to STDOUT (e.g. when piping `--json` to a file).
+func SavedPath(path string) {
+	fmt.Fprintf(os.Stderr, "  %s %s\n", "\033[1;32m✓\033[0m", "Result saved to: "+path)
+}
+
 func Banner() {
 	fmt.Println()
 	fmt.Printf("  %s\n", brandBold("encrata"))

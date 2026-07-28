@@ -14,17 +14,13 @@ var emailVerifyCmd = &cobra.Command{
 		return emailLookup(cmd, args[0], "Verify", "Verifying email...",
 			(*api.Client).EmailVerify,
 			func(r map[string]interface{}) {
-				verdict := field(r, "result", "status", "verdict", "validity")
+				verdict := field(r, "status", "result", "verdict", "validity")
 				printNonEmptyKV(
 					"Email", field(r, "email"),
 					"Result", statusColor(verdict),
 					"Deliverable", deliverableLabel(verdict),
-					"MX found", boolField(r, "mx_found", "smtp.mx_found"),
-					"SMTP check", boolField(r, "smtp_check", "smtp.check"),
-					"Catch-all", boolField(r, "catch_all", "smtp.catch_all"),
-					"Reason", field(r, "reason", "message"),
 				)
 			},
-			nil)
+			freeFooter)
 	},
 }

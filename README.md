@@ -278,9 +278,16 @@ Validate a batch of emails from a CSV/text file or STDIN. Small batches stream
 live results over the terminal with a progress bar; large batches (or `--job`)
 run as an async job that is polled to completion.
 
+By default, bulk validation uses the lean, high-throughput path and returns
+`email`, `status`, and `reason` per row. Add `--enrich` to run the full
+per-email report instead, so every export column (provider, mx, trust grade,
+breaches, etc.) is populated — the same data as `email validity --full`.
+
 ```bash
 encrata email bulk emails.csv
 encrata email bulk emails.csv --out results.csv
+encrata email bulk emails.csv --enrich --out results.csv
+encrata email bulk emails.csv --enrich --concurrency 16 --valid-only --out valid.csv
 encrata email bulk emails.csv --out results.xlsx --columns email,status,trust_grade
 encrata email bulk emails.csv --job --out results.json --format json
 cat emails.csv | encrata email bulk - --stream
@@ -292,13 +299,17 @@ Options:
 | ---- | ----------- |
 | `--stream` | Force live streaming (SSE) mode |
 | `--job` | Force async job mode |
+| `--enrich` | Run the full per-email report so every column is filled (1 credit per email) |
+| `--concurrency` | Parallel lookups when `--enrich` is set (default 8) |
 | `--out` | Write results to a file (`.csv`, `.xlsx`, or `.json`) |
 | `--format` | Export format: `csv`, `xlsx`, or `json` (default: inferred from `--out`) |
 | `--columns` | Subset of columns to export (`email`, `status`, `reason` always included) |
+| `--valid-only` | Export only rows whose status is valid |
 | `--found-only` | Skip rows that carry no enrichment data |
 
 Batches larger than 1,000 emails automatically switch to job mode unless
-`--stream` is set.
+`--stream` is set. The lean path bills 1 credit per successful unique email;
+`--enrich` bills 1 credit per email (full report), so it is opt-in.
 
 #### Export columns
 

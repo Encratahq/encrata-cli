@@ -288,17 +288,47 @@ func renderDomainTrust(r map[string]interface{}) {
 
 func renderFootprint(r map[string]interface{}) {
 	section("Footprint",
-		"Breaches", countField(r, "footprint.breaches", "breaches", "breach_count"),
-		"Gravatar", boolField(r, "footprint.gravatar", "gravatar"),
-		"Registered services", countField(r, "footprint.registered_services", "registered_services"),
-		"Google account", boolField(r, "footprint.google_account", "google_account"),
+		"Breaches", countField(r, "footprint.breaches.count", "footprint.breaches.breach_count", "breaches", "breach_count"),
+		"Gravatar", presenceLabel(r, "footprint.gravatar_url", "footprint.gravatar_profile", "gravatar"),
+		"Registered services", countField(r, "footprint.registered_services", "registered_services.registered_count", "registered_services"),
+		"Google account", firstNonEmpty(field(r, "footprint.google.name"), presenceLabel(r, "footprint.google", "google_account")),
 	)
+}
+
+// presenceLabel returns "yes" when any of the given keys resolves to a truthy,
+// non-empty value (bool true, non-empty string / object / array).
+func presenceLabel(r map[string]interface{}, keys ...string) string {
+	for _, k := range keys {
+		v, ok := lookupRaw(r, k)
+		if !ok {
+			continue
+		}
+		switch t := v.(type) {
+		case bool:
+			if t {
+				return "yes"
+			}
+		case string:
+			if strings.TrimSpace(t) != "" {
+				return "yes"
+			}
+		case map[string]interface{}:
+			if len(t) > 0 {
+				return "yes"
+			}
+		case []interface{}:
+			if len(t) > 0 {
+				return "yes"
+			}
+		}
+	}
+	return ""
 }
 
 func renderDomainInfo(r map[string]interface{}) {
 	section("Domain info",
 		"Registrar", field(r, "domain_info.registrar", "registrar", "whois.registrar"),
-		"Domain created", timeField(r, "domain_info.created", "domain_created", "whois.created_date"),
+		"Domain created", timeField(r, "domain_info.created_at", "domain_info.created", "domain_created", "whois.created_date"),
 		"Domain age (days)", field(r, "domain_info.age_days", "domain_age_days"),
 	)
 }

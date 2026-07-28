@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"encoding/csv"
 	"encoding/json"
@@ -126,6 +127,33 @@ func runCLI(t *testing.T, env map[string]string, args ...string) (string, error)
 		return string(out), ctx.Err()
 	}
 	return string(out), err
+}
+
+// runCLISplit runs the CLI capturing stdout and stderr separately, so tests can
+// assert that --json keeps stdout pure while the spinner writes to stderr.
+func runCLISplit(t *testing.T, env map[string]string, args ...string) (stdout, stderr string, err error) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, cliBinary, args...)
+	cmd.Env = append(os.Environ(),
+		"ENCRATA_API_KEY=",
+		"ENCRATA_BASE_URL=",
+	)
+	for key, value := range env {
+		cmd.Env = append(cmd.Env, key+"="+value)
+	}
+
+	var outBuf, errBuf bytes.Buffer
+	cmd.Stdout = &outBuf
+	cmd.Stderr = &errBuf
+	err = cmd.Run()
+	if ctx.Err() != nil {
+		return outBuf.String(), errBuf.String(), ctx.Err()
+	}
+	return outBuf.String(), errBuf.String(), err
 }
 
 // exitCode extracts the process exit code from a runCLI error (0 when nil).
@@ -772,5 +800,244 @@ func TestJobsRetryIdentityJSON(t *testing.T) {
 	}
 	if !strings.Contains(out, `"requeued": 3`) {
 		t.Fatalf("expected retry response, got:\n%s", out)
+	}
+}
+
+// identityPayload is a full server response used to confirm --json prints the
+// complete raw payload with no field dropping.
+const identityPayload = `{"email":"venkat@unosend.co","validity":"valid","person":{"name":"Venkat","job_title":"Founder","socials":{"linkedin":"https://linkedin.com/in/venkat"}},"registered_services":{"count":2,"services":["github","notion"]},"credits":1,"cache_hit":false}`
+
+func TestEmailIdentityJSONStdoutPure(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/email/identity" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, identityPayload)
+	}))
+	defer server.Close()
+
+	env := map[string]string{"ENCRATA_API_KEY": "test-key", "ENCRATA_BASE_URL": server.URL}
+	stdout, _, err := runCLISplit(t, env, "email", "identity", "venkat@unosend.co", "--json")
+	if err != nil {
+		t.Fatalf("email identity --json failed: %v\nstdout:\n%s", err, stdout)
+	}
+
+	// STDOUT must be valid, complete JSON — spinner output goes to STDERR.
+	var parsed map[string]interface{}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(stdout)), &parsed); err != nil {
+		t.Fatalf("stdout is not pure JSON: %v\nstdout:\n%s", err, stdout)
+	}
+	// Full payload parity: nested + usage fields must survive.
+	if parsed["email"] != "venkat@unosend.co" {
+		t.Fatalf("missing email field: %v", parsed["email"])
+	}
+	if _, ok := parsed["person"].(map[string]interface{}); !ok {
+		t.Fatalf("missing nested person block: %v", parsed["person"])
+	}
+	if _, ok := parsed["registered_services"].(map[string]interface{}); !ok {
+		t.Fatalf("missing registered_services block: %v", parsed["registered_services"])
+	}
+	if parsed["credits"] == nil || parsed["cache_hit"] == nil {
+		t.Fatalf("missing usage fields: credits=%v cache_hit=%v", parsed["credits"], parsed["cache_hit"])
+	}
+}
+
+func TestEmailValidityOutWritesFileAndPrintsPath(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/email/validity" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"email":"venkat@unosend.co","validity":"valid","reason":"deliverable","credits":1}`)
+	}))
+	defer server.Close()
+
+	outPath := filepath.Join(t.TempDir(), "result.json")
+	env := map[string]string{"ENCRATA_API_KEY": "test-key", "ENCRATA_BASE_URL": server.URL}
+	stdout, stderr, err := runCLISplit(t, env, "email", "validity", "venkat@unosend.co", "--out", outPath)
+	if err != nil {
+		t.Fatalf("email validity --out failed: %v\nstdout:\n%s\nstderr:\n%s", err, stdout, stderr)
+	}
+
+	if !strings.Contains(stderr, "Result saved to:") {
+		t.Fatalf("expected saved-path line on stderr, got:\n%s", stderr)
+	}
+	abs, _ := filepath.Abs(outPath)
+	if !strings.Contains(stderr, abs) {
+		t.Fatalf("expected absolute path %q in stderr, got:\n%s", abs, stderr)
+	}
+
+	data, readErr := os.ReadFile(outPath)
+	if readErr != nil {
+		t.Fatalf("failed to read out file: %v", readErr)
+	}
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Fatalf("out file is not valid JSON: %v\n%s", err, string(data))
+	}
+	if parsed["email"] != "venkat@unosend.co" || parsed["validity"] != "valid" {
+		t.Fatalf("unexpected out file payload: %s", string(data))
+	}
+}
+
+func TestEmailValidityJSONOutKeepsStdoutPure(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"email":"venkat@unosend.co","validity":"valid","credits":1}`)
+	}))
+	defer server.Close()
+
+	outPath := filepath.Join(t.TempDir(), "result.json")
+	env := map[string]string{"ENCRATA_API_KEY": "test-key", "ENCRATA_BASE_URL": server.URL}
+	stdout, stderr, err := runCLISplit(t, env, "email", "validity", "venkat@unosend.co", "--json", "--out", outPath)
+	if err != nil {
+		t.Fatalf("email validity --json --out failed: %v\nstdout:\n%s", err, stdout)
+	}
+
+	// stdout stays pure JSON even though a file was also written.
+	if err := json.Unmarshal([]byte(strings.TrimSpace(stdout)), &map[string]interface{}{}); err != nil {
+		t.Fatalf("stdout not pure JSON with --json --out: %v\n%s", err, stdout)
+	}
+	if !strings.Contains(stderr, "Result saved to:") {
+		t.Fatalf("expected saved-path line on stderr, got:\n%s", stderr)
+	}
+	if _, statErr := os.Stat(outPath); statErr != nil {
+		t.Fatalf("expected out file to exist: %v", statErr)
+	}
+}
+
+func TestEmailBreachesRendersBreachInfo(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/email/breaches" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"email":"x@y.com","breached":true,"credits":1,"breach_info":{"breach_count":1,"exposed_data":["Names","Passwords"],"services":[{"name":"Cutout.Pro","domain":"cutout.pro","breach_date":"2024-02-26","data_types":["Names","Passwords","Email addresses"]}]}}`)
+	}))
+	defer server.Close()
+
+	env := map[string]string{"ENCRATA_API_KEY": "test-key", "ENCRATA_BASE_URL": server.URL}
+	out, err := runCLI(t, env, "email", "breaches", "x@y.com", "--full")
+	if err != nil {
+		t.Fatalf("email breaches failed: %v\n%s", err, out)
+	}
+	for _, want := range []string{"Breaches found", "Cutout.Pro", "Names", "Passwords"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected breaches output to contain %q, got:\n%s", want, out)
+		}
+	}
+	// The breach count must not render as 0 when breach_info reports 1.
+	if strings.Contains(out, "Breaches found  0") {
+		t.Fatalf("breach count rendered as 0 despite breach_info.breach_count=1:\n%s", out)
+	}
+}
+
+func TestEmailIdentityRendersPersonBlock(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/email/identity" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"email":"x@y.com","credits":1,"person":{"first_name":"Venkat","last_name":"Rao","job_role":"Founder","company":"Unosend","current_location":"Bengaluru","socials":{"linkedin":"https://linkedin.com/in/venkat"},"registered_services":{"registered_count":3,"services":[{"name":"github"}]},"breach_info":{"breach_count":2},"pdl":{"job_title":"Founder","experience":[{"title":"Founder","company_name":"Unosend","start_date":"2022-01","end_date":""}],"education":[{"school_name":"IIT","degrees":["BTech"],"majors":["CS"],"start_date":"2016","end_date":"2020"}]}}}`)
+	}))
+	defer server.Close()
+
+	env := map[string]string{"ENCRATA_API_KEY": "test-key", "ENCRATA_BASE_URL": server.URL}
+	out, err := runCLI(t, env, "email", "identity", "x@y.com", "--full")
+	if err != nil {
+		t.Fatalf("email identity failed: %v\n%s", err, out)
+	}
+	for _, want := range []string{"Venkat Rao", "Founder", "Unosend", "Bengaluru", "Work history", "IIT", "linkedin"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected identity output to contain %q, got:\n%s", want, out)
+		}
+	}
+}
+
+func TestEmailVerifyRendersStatus(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/email/verify" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"email":"x@y.com","status":"valid"}`)
+	}))
+	defer server.Close()
+
+	env := map[string]string{"ENCRATA_API_KEY": "test-key", "ENCRATA_BASE_URL": server.URL}
+	out, err := runCLI(t, env, "email", "verify", "x@y.com")
+	if err != nil {
+		t.Fatalf("email verify failed: %v\n%s", err, out)
+	}
+	for _, want := range []string{"Result", "valid", "Deliverable"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected verify output to contain %q, got:\n%s", want, out)
+		}
+	}
+}
+
+func TestEmailBulkEnrichFillsColumns(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/email/validity" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		var body map[string]interface{}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		email, _ := body["email"].(string)
+		w.Header().Set("Content-Type", "application/json")
+		// Full per-email report shape, echoing the requested email.
+		_, _ = io.WriteString(w, `{"email":"`+email+`","status":"valid","reason":"deliverable","provider":"google","free_provider":true,"mx":["mx1.example.com"],"domain_trust":{"grade":"A","spf":true,"dmarc":true},"footprint":{"breaches":{"count":1}},"credits":1}`)
+	}))
+	defer server.Close()
+
+	emailFile := filepath.Join(t.TempDir(), "emails.txt")
+	if err := os.WriteFile(emailFile, []byte("a@example.com\nb@example.com\n"), 0o644); err != nil {
+		t.Fatalf("failed to write emails file: %v", err)
+	}
+	out := filepath.Join(t.TempDir(), "enriched.csv")
+	env := map[string]string{"ENCRATA_API_KEY": "test-key", "ENCRATA_BASE_URL": server.URL}
+
+	if o, err := runCLI(t, env, "email", "bulk", emailFile, "--enrich", "--out", out); err != nil {
+		t.Fatalf("bulk --enrich failed: %v\n%s", err, o)
+	}
+
+	f, err := os.Open(out)
+	if err != nil {
+		t.Fatalf("failed to open csv: %v", err)
+	}
+	defer f.Close()
+	records, err := csv.NewReader(f).ReadAll()
+	if err != nil {
+		t.Fatalf("failed to parse csv: %v", err)
+	}
+	if len(records) != 3 {
+		t.Fatalf("expected header + 2 rows, got %d", len(records))
+	}
+	header := records[0]
+
+	// Rows are unordered (concurrent); index by email.
+	byEmail := map[string][]string{}
+	for _, row := range records[1:] {
+		byEmail[row[colIndex(header, "email")]] = row
+	}
+	for _, addr := range []string{"a@example.com", "b@example.com"} {
+		row, ok := byEmail[addr]
+		if !ok {
+			t.Fatalf("missing row for %s", addr)
+		}
+		checks := map[string]string{
+			"status":         "valid",
+			"provider":       "google",
+			"free_provider":  "yes",
+			"mx":             "mx1.example.com",
+			"trust_grade":    "A",
+			"breaches_count": "1",
+		}
+		for col, want := range checks {
+			if got := row[colIndex(header, col)]; got != want {
+				t.Fatalf("%s column %q = %q, want %q", addr, col, got, want)
+			}
+		}
 	}
 }

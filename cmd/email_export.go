@@ -319,7 +319,15 @@ func exportBulk(cmd *cobra.Command, out string, results []map[string]interface{}
 		return err
 	}
 
-	output.SuccessMsg(fmt.Sprintf("Wrote %d %s to %s", len(rows), plural(len(rows), "row", "rows"), out))
+	if info, statErr := os.Stat(out); statErr != nil || info.Size() == 0 {
+		return fmt.Errorf("failed to write results to %s", out)
+	}
+	abs, absErr := filepath.Abs(out)
+	if absErr != nil {
+		abs = out
+	}
+	fmt.Fprintf(os.Stderr, "  Wrote %d %s\n", len(rows), plural(len(rows), "row", "rows"))
+	output.SavedPath(abs)
 	return nil
 }
 

@@ -28,7 +28,9 @@ func init() {
 
 func renderBreaches(full bool) func(map[string]interface{}) {
 	return func(r map[string]interface{}) {
-		count := intOf(countField(r, "breach_count", "breaches", "count"))
+		count := intOf(countField(r,
+			"breach_info.breach_count", "breach_info.count",
+			"breach_count", "breaches", "count"))
 		label := output.Success.Sprint("0")
 		if count > 0 {
 			label = output.Err.Sprint(fmt.Sprintf("%d", count))
@@ -39,9 +41,9 @@ func renderBreaches(full bool) func(map[string]interface{}) {
 		renderBreachTable(r)
 
 		if full {
-			output.KV(
-				"Exposed services", listField(r, "exposed_services", "services"),
-				"Registered services", listField(r, "registered_services"),
+			printNonEmptyKV(
+				"Exposed data", listField(r, "breach_info.exposed_data", "exposed_data", "exposed_services"),
+				"Registered services", listField(r, "registered_services.services", "registered_services"),
 			)
 		}
 	}
@@ -49,7 +51,7 @@ func renderBreaches(full bool) func(map[string]interface{}) {
 
 // renderBreachTable prints a Name | Date | Exposed data table when breaches exist.
 func renderBreachTable(r map[string]interface{}) {
-	arr := firstArr(r, "breaches")
+	arr := firstArr(r, "breach_info.services", "breaches", "breach_info.breaches")
 	if len(arr) == 0 {
 		return
 	}
@@ -58,8 +60,8 @@ func renderBreachTable(r map[string]interface{}) {
 		m := asMap(b)
 		rows = append(rows, []string{
 			firstNonEmpty(field(m, "name", "title", "source"), "—"),
-			firstNonEmpty(timeField(m, "date", "breach_date", "added_date"), "—"),
-			firstNonEmpty(listField(m, "exposed_data", "data_classes", "data"), "—"),
+			firstNonEmpty(timeField(m, "breach_date", "date", "added_date"), "—"),
+			firstNonEmpty(listField(m, "data_types", "exposed_data", "data_classes", "data"), "—"),
 		})
 	}
 	output.Table([]string{"Name", "Date", "Exposed data"}, rows)

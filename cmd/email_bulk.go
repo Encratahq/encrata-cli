@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Encratahq/cli/internal/api"
@@ -25,6 +26,7 @@ an async job that is polled to completion.
 Examples:
   encrata email bulk emails.csv
   encrata email bulk emails.csv --out results.csv
+  encrata email bulk emails.csv --enrich --out results.csv
   encrata email bulk emails.csv --out results.xlsx --columns email,status,trust_grade
   encrata email bulk emails.csv --out results.json --format json
   cat emails.csv | encrata email bulk - --job`,
@@ -35,6 +37,8 @@ Examples:
 func init() {
 	emailBulkCmd.Flags().Bool("stream", false, "Force live streaming (SSE) mode")
 	emailBulkCmd.Flags().Bool("job", false, "Force async job mode")
+	emailBulkCmd.Flags().Bool("enrich", false, "Run the full per-email report so every column is filled (1 credit per email)")
+	emailBulkCmd.Flags().Int("concurrency", 8, "Parallel lookups when --enrich is set")
 	emailBulkCmd.Flags().String("out", "", "Write results to a file (.csv, .xlsx, or .json)")
 	emailBulkCmd.Flags().String("format", "", "Export format: csv, xlsx, or json (default: inferred from --out)")
 	emailBulkCmd.Flags().StringSlice("columns", nil, "Columns to export (email, status, reason always included)")
@@ -46,6 +50,7 @@ func init() {
 func runEmailBulk(cmd *cobra.Command, args []string) error {
 	forceStream, _ := cmd.Flags().GetBool("stream")
 	forceJob, _ := cmd.Flags().GetBool("job")
+	enrich, _ := cmd.Flags().GetBool("enrich")
 	if forceStream && forceJob {
 		return friendlyFormatError(cmd, "choose either --stream or --job, not both")
 	}
@@ -66,11 +71,109 @@ func runEmailBulk(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	if enrich {
+		return runBulkEnrich(cmd, client, emails, out, fields)
+	}
+
 	useJob := forceJob || (!forceStream && len(emails) > bulkStreamThreshold)
 	if useJob {
 		return runBulkJob(cmd, client, fileName, raw, out)
 	}
 	return runBulkStream(cmd, client, emails, fileName, out, fields)
+}
+
+// runBulkEnrich runs the FULL single-email validity report for every address
+// concurrently, so exported rows carry every column (confidence, provider, mx,
+// domain_trust, smtp, footprint, ...) instead of just status/reason. Costs 1
+// credit per email.
+func runBulkEnrich(cmd *cobra.Command, client *api.Client, emails []string, out string, fields []string) error {
+	total := len(emails)
+	asJSON := jsonMode()
+	if !asJSON {
+		output.Header(fmt.Sprintf("Bulk Enrich: %d %s", total, plural(total, "email", "emails")))
+	}
+
+	concurrency, _ := cmd.Flags().GetInt("concurrency")
+	if concurrency < 1 {
+		concurrency = 1
+	}
+	if concurrency > total && total > 0 {
+		concurrency = total
+	}
+
+	results := make([]map[string]interface{}, total)
+	rawResults := make([]json.RawMessage, total)
+	sem := make(chan struct{}, concurrency)
+	var wg sync.WaitGroup
+	var done int32
+	var mu sync.Mutex
+
+	for i, email := range emails {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(idx int, addr string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+
+			data, err := client.EmailValidity(cmd.Context(), addr)
+			row := map[string]interface{}{"email": addr}
+			if err != nil {
+				row["status"] = "error"
+				row["reason"] = err.Error()
+			} else if m, ok := decodeRow(data); ok {
+				row = m
+				if _, hasEmail := row["email"]; !hasEmail {
+					row["email"] = addr
+				}
+				copyRaw := make(json.RawMessage, len(data))
+				copy(copyRaw, data)
+				rawResults[idx] = copyRaw
+			}
+			results[idx] = row
+
+			if !asJSON {
+				mu.Lock()
+				done++
+				renderProgress(int(done), total)
+				mu.Unlock()
+			}
+		}(i, email)
+	}
+	wg.Wait()
+
+	// Drop rows that failed to decode into a payload (nil raw) for the JSON array.
+	cleanRaw := make([]json.RawMessage, 0, total)
+	for _, raw := range rawResults {
+		if len(raw) > 0 {
+			cleanRaw = append(cleanRaw, raw)
+		}
+	}
+
+	if asJSON {
+		output.JSON(rawResultsArray(cleanRaw))
+		if out != "" {
+			return exportBulk(cmd, out, results)
+		}
+		return nil
+	}
+
+	fmt.Println()
+	fmt.Println()
+	printResultsTable(results, fields)
+	printBulkSummaryLine(results)
+	if out != "" {
+		return exportBulk(cmd, out, results)
+	}
+	return nil
+}
+
+// decodeRow unmarshals a single JSON object into a map.
+func decodeRow(data json.RawMessage) (map[string]interface{}, bool) {
+	var m map[string]interface{}
+	if json.Unmarshal(data, &m) != nil {
+		return nil, false
+	}
+	return m, true
 }
 
 func runBulkStream(cmd *cobra.Command, client *api.Client, emails []string, fileName, out string, fields []string) error {
@@ -81,6 +184,7 @@ func runBulkStream(cmd *cobra.Command, client *api.Client, emails []string, file
 	}
 
 	var results []map[string]interface{}
+	var rawResults []json.RawMessage
 	done := 0
 	streamErr := client.BulkValiditySearch(cmd.Context(), emails, fileName, func(ev api.BulkEvent) error {
 		switch ev.Type {
@@ -88,6 +192,9 @@ func runBulkStream(cmd *cobra.Command, client *api.Client, emails []string, file
 			var m map[string]interface{}
 			if json.Unmarshal(ev.Data, &m) == nil {
 				results = append(results, m)
+				raw := make(json.RawMessage, len(ev.Data))
+				copy(raw, ev.Data)
+				rawResults = append(rawResults, raw)
 			}
 			done++
 			if !asJSON {
@@ -112,8 +219,7 @@ func runBulkStream(cmd *cobra.Command, client *api.Client, emails []string, file
 	}
 
 	if asJSON {
-		b, _ := json.Marshal(results)
-		output.JSON(b)
+		output.JSON(rawResultsArray(rawResults))
 		if out != "" {
 			return exportBulk(cmd, out, results)
 		}
@@ -189,6 +295,24 @@ func runBulkJob(cmd *cobra.Command, client *api.Client, fileName string, raw []b
 // normStatus normalizes a validity status for bucketing.
 func normStatus(s string) string {
 	return strings.ReplaceAll(strings.ToLower(strings.TrimSpace(s)), "_", "-")
+}
+
+// rawResultsArray assembles the raw per-row payloads into a single JSON array,
+// preserving the exact server bytes for --json parity with the MCP server.
+func rawResultsArray(rows []json.RawMessage) json.RawMessage {
+	if len(rows) == 0 {
+		return json.RawMessage("[]")
+	}
+	var buf strings.Builder
+	buf.WriteByte('[')
+	for i, row := range rows {
+		if i > 0 {
+			buf.WriteByte(',')
+		}
+		buf.Write(row)
+	}
+	buf.WriteByte(']')
+	return json.RawMessage(buf.String())
 }
 
 // bulkCounts tallies statuses and credits across a result set.

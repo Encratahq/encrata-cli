@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/Encratahq/cli/internal/api"
 	"github.com/Encratahq/cli/internal/output"
@@ -28,27 +29,67 @@ func init() {
 
 func renderIdentity(full bool) func(map[string]interface{}) {
 	return func(r map[string]interface{}) {
+		// The identity response nests the profile under "person"; fall back to the
+		// top level for older/flat shapes.
 		person := getMap(r, "person")
 		if person == nil {
 			person = r
 		}
+
 		printNonEmptyKV(
-			"Name", field(r, "name", "full_name", "person.name"),
-			"Job title", field(r, "job_title", "title", "person.job_title", "person.title"),
-			"Company", field(r, "company", "company.name", "person.company", "person.company.name"),
-			"Location", field(r, "location", "person.location"),
+			"Name", personName(person),
+			"Job title", field(person, "job_role", "job_title", "pdl.job_title", "title"),
+			"Company", field(person, "company", "pdl.job_company_name", "company_profile.name", "company_info.name"),
+			"Industry", field(person, "industry", "pdl.job_company_industry"),
+			"Location", personLocation(person),
+			"Website", field(person, "website"),
+			"Bio", field(person, "bio"),
 		)
 		fmt.Println()
 
-		renderSocials(r, person)
-		renderWorkHistory(r, person)
-		renderEducation(r, person)
+		renderSocials(person)
+		renderWorkHistory(person)
+		renderEducation(person)
 
-		printNonEmptyKV("Breaches", countField(r, "breaches", "breach_count", "footprint.breaches"))
+		registered := countField(person, "registered_services.registered_count", "registered_services.services")
+		printNonEmptyKV(
+			"Registered services", registered,
+			"Breaches", countField(person, "breach_info.breach_count", "breach_info.count", "breaches", "breach_count"),
+		)
 		if full {
-			renderBreachTable(r)
+			renderBreachTable(person)
 		}
 	}
+}
+
+// personName composes a display name from a person object, joining the split
+// name parts when a single name field is absent.
+func personName(person map[string]interface{}) string {
+	if name := field(person, "name", "full_name"); name != "" {
+		return name
+	}
+	parts := make([]string, 0, 3)
+	for _, key := range []string{"first_name", "middle_name", "last_name"} {
+		if v := field(person, key); v != "" {
+			parts = append(parts, v)
+		}
+	}
+	return strings.TrimSpace(strings.Join(parts, " "))
+}
+
+// personLocation builds a readable location from current_location, or city and
+// country when that field is absent.
+func personLocation(person map[string]interface{}) string {
+	if loc := field(person, "current_location", "location"); loc != "" {
+		return loc
+	}
+	parts := make([]string, 0, 2)
+	for _, key := range []string{"city", "country"} {
+		if v := field(person, key); v != "" {
+			parts = append(parts, v)
+		}
+	}
+	return strings.Join(parts, ", ")
 }
 
 func renderSocials(sources ...map[string]interface{}) {
@@ -87,7 +128,7 @@ func renderSocials(sources ...map[string]interface{}) {
 func renderWorkHistory(sources ...map[string]interface{}) {
 	var arr []interface{}
 	for _, r := range sources {
-		if arr = firstArr(r, "work_history", "experience", "employment", "jobs"); len(arr) > 0 {
+		if arr = firstArr(r, "pdl.experience", "work_history", "experience", "employment", "jobs"); len(arr) > 0 {
 			break
 		}
 	}
@@ -100,7 +141,7 @@ func renderWorkHistory(sources ...map[string]interface{}) {
 		m := asMap(it)
 		rows = append(rows, []string{
 			firstNonEmpty(field(m, "title", "role", "position"), "—"),
-			firstNonEmpty(field(m, "company", "name", "organization"), "—"),
+			firstNonEmpty(field(m, "company_name", "company", "name", "organization"), "—"),
 			firstNonEmpty(period(m), "—"),
 		})
 	}
@@ -111,7 +152,7 @@ func renderWorkHistory(sources ...map[string]interface{}) {
 func renderEducation(sources ...map[string]interface{}) {
 	var arr []interface{}
 	for _, r := range sources {
-		if arr = firstArr(r, "education", "schools"); len(arr) > 0 {
+		if arr = firstArr(r, "pdl.education", "education", "schools"); len(arr) > 0 {
 			break
 		}
 	}
@@ -122,9 +163,12 @@ func renderEducation(sources ...map[string]interface{}) {
 	rows := make([][]string, 0, len(arr))
 	for _, it := range arr {
 		m := asMap(it)
-		degree := firstNonEmpty(strings2(field(m, "degree"), field(m, "field", "field_of_study")), "—")
+		degree := firstNonEmpty(strings2(
+			firstNonEmpty(field(m, "degree"), listField(m, "degrees")),
+			firstNonEmpty(field(m, "field", "field_of_study"), listField(m, "majors")),
+		), "—")
 		rows = append(rows, []string{
-			firstNonEmpty(field(m, "school", "name", "institution"), "—"),
+			firstNonEmpty(field(m, "school_name", "school", "name", "institution"), "—"),
 			degree,
 			firstNonEmpty(period(m), "—"),
 		})
