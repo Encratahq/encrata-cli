@@ -2,8 +2,8 @@
 
 The official CLI for Encrata.
 
-Built for intelligence lookups, OSINT workflows, automation scripts, and local
-developer testing.
+Built for email intelligence lookups, validation workflows, async bulk jobs,
+contact list management, automation scripts, and local developer testing.
 
 ---
 
@@ -63,10 +63,10 @@ encrata version
 encrata config set-key YOUR_API_KEY
 
 # Run your first lookup
-encrata ip 8.8.8.8
+encrata email validity user@example.com
 
 # Get the full API response
-encrata company tesla --json
+encrata email enrich user@example.com --json
 ```
 
 ---
@@ -77,7 +77,7 @@ The CLI resolves your API key using this priority chain:
 
 | Priority | Source | How to set |
 | -------- | ------ | ---------- |
-| 1 | `--api-key` flag | `encrata ip 8.8.8.8 --api-key YOUR_API_KEY` |
+| 1 | `--api-key` flag | `encrata email validity user@example.com --api-key YOUR_API_KEY` |
 | 2 | `ENCRATA_API_KEY` env var | `export ENCRATA_API_KEY=YOUR_API_KEY` |
 | 3 | Config file | `encrata config set-key YOUR_API_KEY` |
 
@@ -141,10 +141,354 @@ encrata COMMAND SUBCOMMAND --help
 Examples:
 
 ```bash
-encrata screenshot --help
-encrata workflows --help
-encrata webhooks create --help
+encrata email --help
+encrata email bulk --help
+encrata jobs --help
+encrata lists --help
 ```
+
+---
+
+## Commands
+
+### `encrata version`
+
+Print the installed CLI version.
+
+```bash
+encrata version
+```
+
+---
+
+### `encrata update`
+
+Update the CLI binary to the latest GitHub release.
+
+```bash
+encrata update
+```
+
+---
+
+### `encrata email validity`
+
+Check whether a single email address is valid and deliverable.
+
+```bash
+encrata email validity user@example.com
+encrata email validity user@example.com --json
+```
+
+---
+
+### `encrata email enrich`
+
+Validate an email and enrich it with person and company data.
+
+```bash
+encrata email enrich user@example.com
+encrata email enrich user@example.com --json
+```
+
+---
+
+### `encrata email identity`
+
+Resolve the identity and social profiles behind an email address.
+
+```bash
+encrata email identity user@example.com
+encrata email identity user@example.com --json
+```
+
+---
+
+### `encrata email breaches`
+
+Check whether an email appears in known data breaches.
+
+```bash
+encrata email breaches user@example.com
+encrata email breaches user@example.com --json
+```
+
+---
+
+### `encrata email verify`
+
+Perform a deep SMTP verification of an email address.
+
+```bash
+encrata email verify user@example.com
+encrata email verify user@example.com --json
+```
+
+---
+
+### `encrata password`
+
+Check whether a password has appeared in known data breaches (HIBP
+k-anonymity). Your password is hashed locally with SHA-1 and **only the hash is
+sent** — the plaintext never leaves your machine and is never logged, cached, or
+stored.
+
+```bash
+# Prompt interactively (no echo — never lands in shell history)
+encrata password
+
+# Pass a password as an argument
+encrata password 'hunter2'
+
+# Bulk-check a file (one password per line, de-duplicated, max 1000)
+encrata password --file passwords.txt
+
+# Bulk-check from STDIN
+cat passwords.txt | encrata password --stdin
+
+# Raw JSON output
+encrata password 'hunter2' --json
+```
+
+Options:
+
+| Flag | Description |
+| ---- | ----------- |
+| `--file` | Check passwords from a file (one per line) |
+| `--stdin` | Read passwords from STDIN (one per line) |
+| `--json` | Print raw JSON output (defaults to a formatted table) |
+
+Pricing: **1 credit per unique password** (single = 1; bulk = number of unique
+hashes).
+
+Exit codes (usable as a CI / sign-up guard):
+
+| Code | Meaning |
+| ---- | ------- |
+| `0` | Check succeeded and nothing was breached |
+| `1` | Check succeeded and at least one password was breached |
+| non-zero | Auth, credit, network, or validation error |
+
+---
+
+
+### `encrata email bulk`
+
+Validate a batch of emails from a CSV/text file or STDIN. Small batches stream
+live results over the terminal with a progress bar; large batches (or `--job`)
+run as an async job that is polled to completion.
+
+```bash
+encrata email bulk emails.csv
+encrata email bulk emails.csv --out results.csv
+encrata email bulk emails.csv --out results.xlsx --columns email,status,trust_grade
+encrata email bulk emails.csv --job --out results.json --format json
+cat emails.csv | encrata email bulk - --stream
+```
+
+Options:
+
+| Flag | Description |
+| ---- | ----------- |
+| `--stream` | Force live streaming (SSE) mode |
+| `--job` | Force async job mode |
+| `--out` | Write results to a file (`.csv`, `.xlsx`, or `.json`) |
+| `--format` | Export format: `csv`, `xlsx`, or `json` (default: inferred from `--out`) |
+| `--columns` | Subset of columns to export (`email`, `status`, `reason` always included) |
+| `--found-only` | Skip rows that carry no enrichment data |
+
+Batches larger than 1,000 emails automatically switch to job mode unless
+`--stream` is set.
+
+#### Export columns
+
+CSV and XLSX exports flatten each result into a fixed, ordered column set.
+Booleans render as `yes`/`no` and lists join with ` | `. `email`, `status` and
+`reason` are always present; the rest are empty when not returned:
+
+```text
+email, status, reason, message, confidence, disposable, role, role_name,
+free_provider, provider, did_you_mean, canonical, domain, mx, smtp_mx_host,
+smtp_catch_all, smtp_greylisted, trust_grade, spf, dmarc, dmarc_policy, dkim,
+mta_sts, tls_rpt, bimi, dnssec, person_signal_count, person_signal_sources,
+registrar, domain_created_at, domain_age_days, breaches_count, gravatar,
+registered_services, google_account, checked_at
+```
+
+Use `--columns email,status,trust_grade` to pick a subset. `--format json`
+writes the raw, nested result objects (unflattened) instead of a flat table.
+
+---
+
+
+### `encrata jobs`
+
+Manage asynchronous email jobs. Use these for large inputs that the backend
+processes in the background and returns as downloadable results. The command
+covers three job types — `validity`, `identity`, and `password` — plus the
+underlying bulk-job registry.
+
+#### Validity jobs (file-based)
+
+```bash
+encrata jobs create emails.csv
+encrata jobs list
+encrata jobs status JOB_ID
+encrata jobs results JOB_ID --status invalid
+encrata jobs download JOB_ID --format csv --out results.csv
+encrata jobs cancel JOB_ID
+```
+
+Options:
+
+| Command | Flag | Description |
+| ------- | ---- | ----------- |
+| `results` | `--status` | Filter results by per-row status (e.g. `valid`, `invalid`) |
+| `results` | `--page` | Result page to fetch |
+| `download` | `--format` | Download format: `csv`, `xlsx`, or `json` |
+| `download` | `--status` | Filter rows by status |
+| `download` | `--valid-only` | Download only rows whose status is valid |
+| `download` | `--out` | Write to a file instead of stdout |
+
+#### Create async jobs (inline input)
+
+Create validity, identity, or password jobs directly from inline values or a
+file — no separate upload step required.
+
+```bash
+# Validity job from inline emails
+encrata jobs bulk_validate_emails --emails a@example.com --emails b@example.com
+
+# Identity job from a file
+encrata jobs bulk_email_identity --file emails.csv --file-name "prospects"
+
+# Password breach job from SHA-1 hashes (hashes only — never plaintext)
+encrata jobs bulk_password_breaches --sha1s 5BAA61E4C9B93F3F0682250B6CF8331B7EE68FD8
+encrata jobs bulk_password_breaches --sha1-file hashes.txt
+```
+
+Options:
+
+| Command | Flag | Description |
+| ------- | ---- | ----------- |
+| `bulk_validate_emails` | `--emails` | Inline email addresses (repeatable) |
+| `bulk_validate_emails` | `--file` | Read emails from a file |
+| `bulk_validate_emails` | `--file-name` | Optional display name for the job |
+| `bulk_validate_emails` | `--batch-id` | Optional grouping ID across related jobs |
+| `bulk_email_identity` | `--emails` / `--file` / `--file-name` | Same inputs as above |
+| `bulk_password_breaches` | `--sha1s` | Inline SHA-1 hashes (40-char hex, repeatable) |
+| `bulk_password_breaches` | `--sha1-file` | Read SHA-1 hashes from a file |
+| `bulk_password_breaches` | `--file-name` | Optional display name for the job |
+
+Only UPPER-CASE hex SHA-1 hashes are transmitted for password jobs — plaintext
+passwords are never sent.
+
+#### Track and manage any job type
+
+These commands accept `--job-type validity|identity|password` (default
+`validity`) and operate on a job ID.
+
+```bash
+encrata jobs get_email_job_status  JOB_ID --job-type identity
+encrata jobs get_email_job_results JOB_ID --job-type password --page 1 --page-size 100 --breached
+encrata jobs download_email_job    JOB_ID --job-type identity --found-only --out out.csv
+encrata jobs cancel_email_job      JOB_ID --job-type validity
+encrata jobs retry_email_job       JOB_ID --job-type validity
+```
+
+Options:
+
+| Command | Flag | Description |
+| ------- | ---- | ----------- |
+| `get_email_job_results` | `--page` | 1-based page number |
+| `get_email_job_results` | `--page-size` | Results per page |
+| `get_email_job_results` | `--breached` | Password: breached only; identity: found only |
+| `get_email_job_results` | `--found-only` | Identity: found rows only |
+| `download_email_job` | `--format` | Download format: `csv` |
+| `download_email_job` | `--status` | Validity-only per-row status filter |
+| `download_email_job` | `--breached` | Password: breached only; identity: found only |
+| `download_email_job` | `--found-only` | Identity: found rows only |
+| `download_email_job` | `--out` | Write to a file instead of stdout |
+
+#### Bulk-job registry
+
+Inspect and manage the underlying bulk-job records.
+
+```bash
+encrata jobs list_bulk_jobs
+encrata jobs get_bulk_job JOB_ID
+encrata jobs cancel_bulk_job JOB_ID
+```
+
+---
+
+### `encrata lists`
+
+Manage reusable contact lists — named collections of emails you can share across
+enrichment and monitoring workflows.
+
+```bash
+encrata lists list
+encrata lists create "Prospects" --emails a@example.com --emails b@example.com
+encrata lists create "Q3 Leads" --file emails.csv
+encrata lists get LIST_ID
+encrata lists emails LIST_ID
+encrata lists add LIST_ID --emails new@example.com
+encrata lists remove LIST_ID --emails old@example.com
+encrata lists delete LIST_ID
+```
+
+Subcommands:
+
+| Command | Aliases | Description |
+| ------- | ------- | ----------- |
+| `list` | `ls` | List all contact lists |
+| `create` | | Create a list, optionally seeding emails |
+| `get` | `show` | Show a list's details |
+| `emails` | | List every email in a list |
+| `add` | | Add emails to a list |
+| `remove` | `rm-emails` | Remove emails from a list |
+| `delete` | `rm`, `del` | Delete a list permanently |
+
+Options:
+
+| Command | Flag | Description |
+| ------- | ---- | ----------- |
+| `create` | `--emails` | Initial email addresses (repeatable) |
+| `create` | `--file` | Read initial emails from a file |
+| `add` | `--emails` / `--file` | Emails to add |
+| `remove` | `--emails` / `--file` | Emails to remove |
+
+---
+
+### `encrata keys`
+
+Create, list, and revoke API keys.
+
+```bash
+encrata keys ls
+encrata keys create "CI key"
+encrata keys revoke KEY_ID
+encrata keys revoke KEY_ID --permanent
+```
+
+---
+
+## Credits
+
+Billing is 1 credit per successful unique email. Duplicate emails are
+de-duplicated, and invalid or failed checks are not charged.
+
+| Command | Credits |
+| ------- | ------- |
+| `email validity` | 1 credit per successful email |
+| `email enrich` | 1 credit per successful email |
+| `email identity` | 1 credit per successful email |
+| `email breaches` | 1 credit per successful email |
+| `email verify` | 1 credit per successful email |
+| `email bulk` | 1 credit per successful unique email |
+| `jobs` | 1 credit per successful unique email |
+| `lists` | Free — list management does not consume credits |
 
 ---
 
@@ -177,14 +521,14 @@ go test ./...
 
 ```bash
 go run . version
-go run . ip 8.8.8.8
+go run . email validity user@example.com
 ```
 
 4. Point local runs at a local backend.
 
 ```powershell
 $env:ENCRATA_BASE_URL = "http://localhost:8080"
-go run . domain google.com
+go run . email enrich user@example.com
 ```
 
 ### Build locally
@@ -200,568 +544,6 @@ go build -o encrata.exe .
 ```
 
 Output: `./encrata` or `./encrata.exe`.
-
----
-
-## Commands
-
-### `encrata version`
-
-Print the installed CLI version.
-
-```bash
-encrata version
-```
-
----
-
-### `encrata update`
-
-Update the CLI binary to the latest GitHub release.
-
-```bash
-encrata update
-```
-
----
-
-### `encrata email`
-
-Look up a person or identity by email address. The response can include profile
-data, company data, social links, breach signals, and related metadata.
-
-```bash
-encrata email user@example.com
-encrata email user@example.com --fields name,company,social_profiles
-encrata email user@example.com --nocache
-encrata email user@example.com --json
-```
-
-Options:
-
-| Flag | Description |
-| ---- | ----------- |
-| `--fields` | Limit the response to specific fields |
-| `--nocache` | Bypass cache and run a fresh lookup |
-| `--country` | Country code hint |
-| `--lang` | Language code hint |
-| `--num` | Number of results |
-| `--page` | Page number |
-
----
-
-### `encrata phone`
-
-Look up a phone number. The response can include carrier, country, normalized
-format, validity, risk, and related intelligence.
-
-```bash
-encrata phone "+14155552671"
-encrata phone "+447911123456" --json
-```
-
----
-
-### `encrata ip`
-
-Look up an IP address. The response can include location, ASN, network owner,
-company, ISP, and threat signals.
-
-```bash
-encrata ip 8.8.8.8
-encrata ip 2001:4860:4860::8888 --json
-```
-
----
-
-### `encrata domain`
-
-Investigate a domain. The response can include WHOIS, DNS, SSL, risk,
-technology, popularity, URL scan, and related summary data.
-
-```bash
-encrata domain google.com
-encrata domain google.com --json
-```
-
----
-
-### `encrata company`
-
-Search for company intelligence. Table output summarizes profile data,
-knowledge graph data, top search results, and SEC filings when available.
-
-```bash
-encrata company tesla
-encrata company tesla --json
-```
-
----
-
-### `encrata google`
-
-Run Google OSINT searches or dorking queries.
-
-```bash
-encrata google "site:example.com filetype:pdf"
-encrata google "intitle:index.of password"
-encrata google "open source intelligence" --json
-```
-
-Options:
-
-| Flag | Description |
-| ---- | ----------- |
-| `--type` | Search type: `search`, `news`, `images`, `videos`, `scholar`, `places`, `maps`, `shopping`, `patents`, or `autocomplete` |
-| `--country` | Country code hint |
-| `--lang` | Language code hint |
-| `--num` | Number of results |
-| `--page` | Page number |
-
----
-
-### `encrata darkweb`
-
-Search dark web intelligence for emails, domains, keywords, breach records, and
-onion search results. Enriched results can include LeakCheck breach data and
-darkdump onion search hits.
-
-```bash
-encrata darkweb user@example.com
-encrata darkweb example.com
-encrata darkweb "company name" --offset 10
-encrata darkweb user@example.com --json
-```
-
-Options:
-
-| Flag | Description |
-| ---- | ----------- |
-| `--offset` | Pagination offset |
-
----
-
-### `encrata darkweb crawl`
-
-Crawl a `.onion` URL through the dark web crawl endpoint. Use it to check
-whether an onion page is live, collect linked onion URLs, and extract page-level
-emails, phone numbers, titles, and status codes.
-
-```bash
-encrata darkweb crawl http://exampleonionaddress.onion
-encrata darkweb crawl http://exampleonionaddress.onion --depth 2
-encrata darkweb crawl http://exampleonionaddress.onion --depth 3 --force
-encrata darkweb crawl http://exampleonionaddress.onion --json
-```
-
-Options:
-
-| Flag | Description |
-| ---- | ----------- |
-| `--depth` | Crawl depth from 1 to 3. Default is 1 |
-| `--force` | Bypass cache and run a fresh crawl |
-
----
-
-### `encrata validate`
-
-Validate an email address.
-
-```bash
-encrata validate user@example.com
-encrata validate user@example.com --json
-```
-
----
-
-### `encrata breaches`
-
-Check whether an email appears in known breach data.
-
-```bash
-encrata breaches user@example.com
-encrata breaches user@example.com --json
-```
-
----
-
-### `encrata scrape`
-
-Fetch raw HTML from a web page. JavaScript rendering is enabled by default.
-
-```bash
-encrata scrape https://example.com
-encrata scrape https://example.com -o page.html
-encrata scrape https://example.com --no-js
-encrata scrape https://example.com --wait-for "#main"
-```
-
-Options:
-
-| Flag | Description |
-| ---- | ----------- |
-| `-o, --output-file` | Write HTML to a file |
-| `--no-js` | Disable JavaScript rendering |
-| `--wait-for` | Wait for a CSS selector |
-| `--timeout` | Timeout in milliseconds |
-
----
-
-### `encrata extract`
-
-Extract clean page content as markdown, text, or structured selector fields.
-
-```bash
-encrata extract https://example.com
-encrata extract https://example.com --mode markdown
-encrata extract https://example.com --mode text
-encrata extract https://example.com --selector title=h1 --selector price=.price
-encrata extract https://example.com --wait-for "main" --timeout 10000
-encrata extract https://example.com --block-ads --block-trackers
-encrata extract https://example.com --header "User-Agent=EncrataBot/1.0"
-```
-
-Options:
-
-| Flag | Description |
-| ---- | ----------- |
-| `--mode` | `markdown`, `text`, or `selectors` |
-| `--selector` | Field selector as `name=css`; repeatable |
-| `--no-js` | Disable JavaScript rendering |
-| `--block-ads` | Block ads while extracting |
-| `--block-trackers` | Block trackers while extracting |
-| `--wait-for` | Wait for a CSS selector before extraction |
-| `--header` | Custom request header as `name=value`; repeatable |
-| `--timeout` | Timeout in milliseconds |
-
----
-
-### `encrata screenshot`
-
-Capture a page, viewport, or selected element as PNG or JPEG.
-
-```bash
-encrata screenshot https://example.com
-encrata screenshot https://example.com -o shot.jpeg --format jpeg
-encrata screenshot https://example.com --viewport
-encrata screenshot https://example.com --selector "#hero"
-encrata screenshot https://example.com --wait-for "#hero" --timeout 10000
-encrata screenshot https://example.com --header "User-Agent=EncrataBot/1.0"
-```
-
-Options:
-
-| Flag | Description |
-| ---- | ----------- |
-| `-o, --output-file` | Output file path |
-| `--format` | `png` or `jpeg` |
-| `--viewport` | Capture only the viewport |
-| `--selector` | Capture one CSS selector |
-| `--no-js` | Disable JavaScript rendering |
-| `--block-ads` | Block ads while capturing |
-| `--block-trackers` | Block trackers while capturing |
-| `--wait-for` | Wait for a CSS selector before capture |
-| `--header` | Custom request header as `name=value`; repeatable |
-| `--timeout` | Timeout in milliseconds |
-
----
-
-### `encrata face`
-
-Search for matching faces and linked identities from an image URL.
-
-```bash
-encrata face https://example.com/photo.jpg
-encrata face https://example.com/photo.jpg --threshold 0.8
-encrata face https://example.com/photo.jpg --json
-```
-
-Options:
-
-| Flag | Description |
-| ---- | ----------- |
-| `--threshold` | Match confidence threshold from 0 to 1 |
-
----
-
-### `encrata bulk lookup`
-
-Run synchronous bulk email enrichment. Use this for smaller batches where you
-want streamed results in the terminal.
-
-```bash
-encrata bulk lookup user@example.com admin@example.com
-encrata bulk lookup --file emails.txt
-encrata bulk lookup --file emails.txt --fields name,company
-encrata bulk lookup --file emails.txt --json
-```
-
-Options:
-
-| Flag | Description |
-| ---- | ----------- |
-| `-f, --file` | Read emails from a file |
-| `--fields` | Limit returned fields |
-
----
-
-### `encrata bulk google`
-
-Run multiple Google OSINT searches.
-
-```bash
-encrata bulk google "open source intelligence" "tesla"
-encrata bulk google --file queries.txt
-encrata bulk google --file queries.txt --json
-```
-
-Options:
-
-| Flag | Description |
-| ---- | ----------- |
-| `-f, --file` | Read queries from a file |
-
----
-
-### `encrata bulk company`
-
-Run multiple company lookups.
-
-```bash
-encrata bulk company tesla openai stripe
-encrata bulk company --file companies.txt
-encrata bulk company --file companies.txt --json
-```
-
-Options:
-
-| Flag | Description |
-| ---- | ----------- |
-| `-f, --file` | Read companies from a file |
-
----
-
-### `encrata bulk domain`
-
-Run multiple domain lookups.
-
-```bash
-encrata bulk domain example.com encrata.com
-encrata bulk domain --file domains.txt
-encrata bulk domain --file domains.txt --json
-```
-
-Options:
-
-| Flag | Description |
-| ---- | ----------- |
-| `-f, --file` | Read domains from a file |
-
----
-
-### `encrata bulk ip`
-
-Run multiple IP lookups.
-
-```bash
-encrata bulk ip 8.8.8.8 1.1.1.1
-encrata bulk ip --file ips.txt
-encrata bulk ip --file ips.txt --json
-```
-
-Options:
-
-| Flag | Description |
-| ---- | ----------- |
-| `-f, --file` | Read IP addresses from a file |
-
----
-
-### `encrata jobs`
-
-Manage asynchronous bulk email jobs. Use this for larger files where the backend
-should process the batch in the background and return a downloadable result.
-
-```bash
-encrata jobs create --file emails.txt
-encrata jobs list
-encrata jobs get JOB_ID
-encrata jobs cancel JOB_ID
-```
-
-Options:
-
-| Flag | Description |
-| ---- | ----------- |
-| `-f, --file` | Read emails from a file when creating a job |
-
----
-
-### `encrata lists`
-
-Manage reusable contact lists for enrichment and monitoring.
-
-```bash
-encrata lists ls
-encrata lists create "Prospects" --type email --targets user@example.com
-encrata lists get LIST_ID
-encrata lists emails LIST_ID
-encrata lists add LIST_ID user@example.com admin@example.com
-encrata lists remove LIST_ID user@example.com
-encrata lists rm LIST_ID
-```
-
-Options:
-
-| Flag | Description |
-| ---- | ----------- |
-| `--type` | Filter lists by type on `ls`, or set the list type on `create` |
-| `--targets` | Initial targets to add when creating a list |
-
----
-
-### `encrata monitors`
-
-Create monitors, trigger runs, and inspect monitor results.
-
-```bash
-encrata monitors ls
-encrata monitors create "VIP contacts" --emails user@example.com --frequency monthly
-encrata monitors create "List monitor" --list-id LIST_ID --frequency weekly
-encrata monitors get MONITOR_ID
-encrata monitors run MONITOR_ID
-encrata monitors runs MONITOR_ID
-encrata monitors results MONITOR_ID RUN_ID
-encrata monitors results MONITOR_ID RUN_ID --changes-only
-encrata monitors all-runs
-encrata monitors all-results
-```
-
-Options:
-
-| Flag | Description |
-| ---- | ----------- |
-| `--emails` | Emails to monitor when creating a monitor |
-| `--list-id` | Contact list ID to use as the monitor data source |
-| `--frequency` | Monitor frequency: `weekly`, `biweekly`, `monthly`, or `quarterly` |
-| `--change-detection` | Change detection mode: `diff_only` or `full_refresh` |
-| `--changes-only` | Only show records with changes |
-| `--limit` | Results per page |
-| `--offset` | Result offset |
-
----
-
-### `encrata workflows`
-
-Manage automation workflows, templates, runs, and workflow secrets.
-
-```bash
-encrata workflows ls
-encrata workflows templates
-encrata workflows templates --category monitoring
-encrata workflows create "Daily enrichment" --template-id TEMPLATE_ID
-encrata workflows create "Custom workflow" --file workflow.json
-encrata workflows get WORKFLOW_ID
-encrata workflows update WORKFLOW_ID --status active
-encrata workflows test WORKFLOW_ID
-encrata workflows runs --workflow-id WORKFLOW_ID
-encrata workflows runs --workflow-id WORKFLOW_ID --page 2 --limit 20
-encrata workflows run RUN_ID
-encrata workflows secrets ls
-encrata workflows secrets set API_TOKEN secret-value
-encrata workflows secrets set API_TOKEN secret-value --name "Production API token"
-encrata workflows secrets rm SECRET_ID
-```
-
-Workflow templates are reusable starting points for common automations. Use
-`encrata workflows templates` to list available templates, then pass a template
-ID to `encrata workflows create --template-id`.
-
-Options:
-
-| Flag | Description |
-| ---- | ----------- |
-| `--status` | Filter workflows by status on `ls`, or set status on `update` |
-| `--description` | Workflow description on `create` or `update` |
-| `--template-id` | Create a workflow from a template |
-| `-f, --file` | JSON file with trigger and steps for `create` or `update` |
-| `--name` | New workflow name on `update`, or display name when setting a workflow secret |
-| `--category` | Filter templates by category |
-| `--workflow-id` | Filter runs by workflow ID |
-| `--page` | Page number for workflow and run lists |
-| `--limit` | Results per page for workflow and run lists |
-
----
-
-### `encrata webhooks`
-
-Register webhooks and inspect delivery attempts.
-
-```bash
-encrata webhooks ls
-encrata webhooks create https://example.com/hook --events lookup.completed
-encrata webhooks update WEBHOOK_ID https://example.com/new-hook --active=false
-encrata webhooks test WEBHOOK_ID
-encrata webhooks deliveries WEBHOOK_ID
-encrata webhooks rm WEBHOOK_ID
-```
-
-Options:
-
-| Flag | Description |
-| ---- | ----------- |
-| `--events` | Event types to subscribe to |
-| `--description` | Webhook description |
-| `--active` | Whether the webhook is active when updating |
-
-Valid events:
-
-| Event | Description |
-| ----- | ----------- |
-| `lookup.completed` | A lookup finished and can be delivered to the webhook |
-| `apikey.created` | An API key was created |
-| `apikey.revoked` | An API key was revoked |
-| `credits.low` | Account credits are low |
-| `credits.exhausted` | Account credits are exhausted |
-
----
-
-### `encrata keys`
-
-Create, list, and revoke API keys.
-
-```bash
-encrata keys ls
-encrata keys create "CI key"
-encrata keys revoke KEY_ID
-encrata keys revoke KEY_ID --permanent
-```
-
----
-
-## Credits
-
-Credit usage depends on the command and whether the backend can serve a cached
-result.
-
-| Command | Credits |
-| ------- | ------- |
-| `email` | 1 credit per lookup; cached results may be free |
-| `phone` | 1 credit per lookup |
-| `domain` | 1 credit |
-| `company` | 1 credit |
-| `google` | 1 credit |
-| `darkweb` | 1 credit for the first page; pagination may be free |
-| `darkweb crawl` | Depends on crawl depth and cache status |
-| `scrape` | 1 credit per page |
-| `extract` | 1 credit per page |
-| `screenshot` | Credits depend on capture settings |
-| `face` | 5 credits per search |
-| `bulk` | Depends on operation and input count |
-| `jobs` | Depends on email count |
-| `ip` | Free |
-| `validate` | Free |
-| `breaches` | Free |
 
 ---
 

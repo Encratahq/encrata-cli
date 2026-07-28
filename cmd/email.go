@@ -1,8 +1,12 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/Encratahq/cli/internal/api"
@@ -12,198 +16,146 @@ import (
 )
 
 var emailCmd = &cobra.Command{
-	Use:   "email [address]",
-	Short: "Look up an email address",
-	Long:  "Retrieve intelligence data for an email address including social profiles, breaches, and more.",
-	Args:  cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := validation.Email(args[0]); err != nil {
-			return friendlyFormatError(cmd, err.Error())
-		}
-		if err := cfg.Validate(); err != nil {
-			return err
-		}
+	Use:   "email",
+	Short: "Email intelligence lookups",
+	Long: `Validate, enrich, and investigate email addresses.
 
-		client := api.New(cfg.BaseURL, cfg.APIKey)
-
-		country, _ := cmd.Flags().GetString("country")
-		lang, _ := cmd.Flags().GetString("lang")
-		num, _ := cmd.Flags().GetInt("num")
-		page, _ := cmd.Flags().GetInt("page")
-		fields, _ := cmd.Flags().GetStringSlice("fields")
-		nocache, _ := cmd.Flags().GetBool("nocache")
-
-		req := &api.EmailRequest{
-			Email:   args[0],
-			Country: country,
-			Lang:    lang,
-			Num:     num,
-			Page:    page,
-			Fields:  fields,
-		}
-
-		spinner := startSpinner("Looking up email...")
-		data, err := client.EmailLookup(cmd.Context(), req, nocache)
-		stopSpinner(spinner)
-		if err != nil {
-			output.Error(err.Error())
-			return err
-		}
-
-		if cfg.Output == "json" {
-			output.JSON(data)
-			return nil
-		}
-
-		// Parse and display key fields
-		var result map[string]interface{}
-		if err := json.Unmarshal(data, &result); err != nil {
-			output.JSON(data)
-			return nil
-		}
-
-		output.Header("Email Lookup: " + args[0])
-		displayEmailResult(result)
-		return nil
-	},
-}
-
-func displayEmailResult(result map[string]interface{}) {
-	credits := ""
-	if c, ok := result["credits"]; ok {
-		credits = fmt.Sprintf("%.0f", c)
-	}
-
-	name := firstNonEmpty(getStr(result, "name"), getNestedStr(result, "person", "name"))
-	email := getStr(result, "email")
-	company := getEmailCompany(result)
-	photo := getStr(result, "photo")
-	validity := getStr(result, "validity")
-	if printNonEmptyKV(
-		"Name", name,
-		"Email", email,
-		"Company", company,
-		"Photo", photo,
-		"Validity", validity,
-	) {
-		fmt.Println()
-	}
-
-	if person, ok := result["person"].(map[string]interface{}); ok {
-		location := getStr(person, "location")
-		bio := getStr(person, "bio")
-		if printNonEmptyKV(
-			"Location", location,
-			"Bio", bio,
-		) {
-			fmt.Println()
-		}
-	}
-
-	if socials, ok := result["socials"].(map[string]interface{}); ok && len(socials) > 0 {
-		output.Bold.Println("  Socials:")
-		for platform, url := range socials {
-			if url != nil && fmt.Sprintf("%v", url) != "" {
-				fmt.Printf("    %s: %v\n", platform, url)
-			}
-		}
-		fmt.Println()
-	}
-
-	if socials, ok := result["social_profiles"].([]interface{}); ok && len(socials) > 0 {
-		output.Bold.Println("  Social Profiles:")
-		for _, s := range socials {
-			if profile, ok := s.(map[string]interface{}); ok {
-				platform := getStr(profile, "platform")
-				url := getStr(profile, "url")
-				fmt.Printf("    • %s: %s\n", platform, url)
-			}
-		}
-		fmt.Println()
-	}
-
-	if breach, ok := result["breach"].(map[string]interface{}); ok {
-		count := getInt(breach, "count")
-		if count > 0 {
-			output.Warn.Printf("  Found in %d breach(es)\n", count)
-			if services, ok := breach["services"].([]interface{}); ok && len(services) > 0 {
-				output.KV("Services", joinInterfaces(services))
-			}
-			if exposedData, ok := breach["exposed_data"].([]interface{}); ok && len(exposedData) > 0 {
-				output.KV("Exposed Data", joinInterfaces(exposedData))
-			}
-			fmt.Println()
-		}
-	}
-
-	if breaches, ok := result["breaches"].([]interface{}); ok && len(breaches) > 0 {
-		output.Warn.Printf("  ⚠ Found in %d breach(es)\n", len(breaches))
-		for _, b := range breaches {
-			if breach, ok := b.(map[string]interface{}); ok {
-				name := getStr(breach, "name")
-				date := getStr(breach, "date")
-				fmt.Printf("    • %s (%s)\n", name, date)
-			}
-		}
-		fmt.Println()
-	}
-
-	if credits != "" {
-		output.Dim.Printf("  Credits used: %s\n", credits)
-	}
-}
-
-func getStr(m map[string]interface{}, key string) string {
-	if v, ok := m[key]; ok && v != nil {
-		return fmt.Sprintf("%v", v)
-	}
-	return ""
-}
-
-func getNestedStr(m map[string]interface{}, parent, key string) string {
-	if child, ok := m[parent].(map[string]interface{}); ok {
-		return getStr(child, key)
-	}
-	return ""
-}
-
-func getEmailCompany(m map[string]interface{}) string {
-	if company, ok := m["company"].(map[string]interface{}); ok {
-		return firstNonEmpty(getStr(company, "name"), getStr(company, "domain"), getStr(company, "website"))
-	}
-	return firstNonEmpty(getStr(m, "company"), getNestedStr(m, "person", "company"))
-}
-
-func printNonEmptyKV(pairs ...string) bool {
-	filtered := make([]string, 0, len(pairs))
-	for i := 0; i+1 < len(pairs); i += 2 {
-		if pairs[i+1] == "" {
-			continue
-		}
-		filtered = append(filtered, pairs[i], pairs[i+1])
-	}
-	if len(filtered) == 0 {
-		return false
-	}
-	output.KV(filtered...)
-	return true
-}
-
-func joinInterfaces(values []interface{}) string {
-	parts := make([]string, 0, len(values))
-	for _, value := range values {
-		if value != nil {
-			parts = append(parts, fmt.Sprintf("%v", value))
-		}
-	}
-	return strings.Join(parts, ", ")
+Examples:
+  encrata email validity  user@example.com
+  encrata email enrich    user@example.com
+  encrata email identity  user@example.com
+  encrata email breaches  user@example.com
+  encrata email verify    user@example.com
+  encrata email bulk      emails.csv --out results.csv`,
 }
 
 func init() {
-	emailCmd.Flags().String("country", "", "Country code (e.g. us, in)")
-	emailCmd.Flags().String("lang", "", "Language code (e.g. en)")
-	emailCmd.Flags().Int("num", 0, "Number of results")
-	emailCmd.Flags().Int("page", 0, "Page number")
-	emailCmd.Flags().StringSlice("fields", nil, "Specific fields to return")
-	emailCmd.Flags().Bool("nocache", false, "Bypass the cache and run a fresh lookup")
+	emailCmd.AddCommand(
+		emailValidityCmd,
+		emailEnrichCmd,
+		emailIdentityCmd,
+		emailBreachesCmd,
+		emailVerifyCmd,
+		emailBulkCmd,
+	)
 }
+
+// emailLookup runs a single-email API call and renders the result, mirroring the
+// spinner / --json / header conventions used across the CLI. footer prints the
+// trailing line (credits or a free note); when nil it defaults to printCredits.
+func emailLookup(
+	cmd *cobra.Command,
+	email, title, spinnerMsg string,
+	call func(*api.Client, context.Context, string) (json.RawMessage, error),
+	render func(map[string]interface{}),
+	footer func(map[string]interface{}),
+) error {
+	if err := validation.Email(email); err != nil {
+		return friendlyFormatError(cmd, err.Error())
+	}
+	client, err := newClient()
+	if err != nil {
+		return err
+	}
+
+	spinner := startSpinner(spinnerMsg)
+	data, err := call(client, cmd.Context(), email)
+	stopSpinner(spinner)
+	if err != nil {
+		output.Error(err.Error())
+		return err
+	}
+
+	if jsonMode() {
+		output.JSON(data)
+		return nil
+	}
+
+	var result map[string]interface{}
+	if !decode(data, &result) {
+		return nil
+	}
+
+	output.Header(title + ": " + email)
+	render(result)
+	if footer != nil {
+		footer(result)
+	} else {
+		printCredits(result)
+	}
+	return nil
+}
+
+// printCredits prints the credit cost of a response, defaulting to 0.
+func printCredits(result map[string]interface{}) {
+	output.Dim.Printf("  Credits used: %s\n", creditsValue(result))
+}
+
+// freeFooter notes that a command does not consume credits.
+func freeFooter(map[string]interface{}) {
+	output.Dim.Println("  Free — no credits used")
+}
+
+// loadEmails reads emails from a file path (or STDIN when path is empty or "-"),
+// parses CSV/line content, validates and de-duplicates them, and returns the
+// unique emails alongside the raw bytes and a display file name.
+func loadEmails(cmd *cobra.Command, path string) (fileName string, emails []string, raw []byte, err error) {
+	fileName = "list.csv"
+	if path == "" || path == "-" {
+		raw, err = io.ReadAll(cmd.InOrStdin())
+		if err != nil {
+			return "", nil, nil, fmt.Errorf("failed to read from stdin: %w", err)
+		}
+	} else {
+		raw, err = os.ReadFile(path)
+		if err != nil {
+			return "", nil, nil, err
+		}
+		fileName = filepath.Base(path)
+	}
+
+	emails = parseEmails(raw)
+	if len(emails) == 0 {
+		return "", nil, nil, fmt.Errorf("no valid email addresses found in input")
+	}
+	return fileName, emails, raw, nil
+}
+
+// parseEmails extracts unique valid email addresses from CSV/line input.
+func parseEmails(raw []byte) []string {
+	seen := make(map[string]bool)
+	var emails []string
+	for _, line := range strings.Split(string(raw), "\n") {
+		line = strings.TrimSpace(strings.TrimSuffix(line, "\r"))
+		if line == "" {
+			continue
+		}
+		for _, cell := range strings.Split(line, ",") {
+			cell = strings.TrimSpace(cell)
+			key := strings.ToLower(cell)
+			if validation.Email(cell) == nil && !seen[key] {
+				seen[key] = true
+				emails = append(emails, cell)
+			}
+		}
+	}
+	return emails
+}
+
+// renderProgress draws an in-place progress bar for streaming/polling work.
+func renderProgress(done, total int) {
+	const width = 30
+	ratio := 0.0
+	if total > 0 {
+		ratio = float64(done) / float64(total)
+	}
+	if ratio > 1 {
+		ratio = 1
+	}
+	filled := int(ratio * float64(width))
+	bar := strings.Repeat("█", filled) + strings.Repeat("░", width-filled)
+	fmt.Printf("\r  %s %d/%d", output.Brand.Sprint(bar), done, total)
+}
+
+// writeResults, writeCSV and cellString were replaced by the flattened bulk
+// exporter in email_export.go.

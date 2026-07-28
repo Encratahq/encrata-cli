@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -237,6 +238,81 @@ func (c *Client) put(ctx context.Context, path string, payload interface{}) (jso
 
 func (c *Client) del(ctx context.Context, path string, query url.Values, payload interface{}) (json.RawMessage, error) {
 	return c.do(ctx, http.MethodDelete, path, query, payload)
+}
+
+// postMultipart sends a multipart/form-data POST with a single file field plus
+// optional text fields. Used for large file uploads (e.g. job CSVs).
+func (c *Client) postMultipart(ctx context.Context, path, fileField, fileName string, fileData []byte, fields map[string]string) (json.RawMessage, error) {
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	for key, value := range fields {
+		if err := w.WriteField(key, value); err != nil {
+			return nil, fmt.Errorf("failed to encode form field: %w", err)
+		}
+	}
+	part, err := w.CreateFormFile(fileField, fileName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build upload: %w", err)
+	}
+	if _, err := part.Write(fileData); err != nil {
+		return nil, fmt.Errorf("failed to write upload: %w", err)
+	}
+	if err := w.Close(); err != nil {
+		return nil, fmt.Errorf("failed to finalize upload: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+path, &buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.APIKey)
+	req.Header.Set("User-Agent", c.UserAgent)
+
+	resp, err := c.streamClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, parseError(resp.StatusCode, data)
+	}
+	return json.RawMessage(data), nil
+}
+
+// getBytes issues a GET and returns the raw response body, for downloading
+// generated files (CSV/JSON) rather than parsing JSON.
+func (c *Client) getBytes(ctx context.Context, path string, query url.Values) ([]byte, error) {
+	endpoint := c.BaseURL + path
+	if len(query) > 0 {
+		endpoint += "?" + query.Encode()
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	c.setHeaders(req, false)
+
+	resp, err := c.streamClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, parseError(resp.StatusCode, data)
+	}
+	return data, nil
 }
 
 func retryDelay(attempt int, retryAfter string) time.Duration {

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -34,8 +35,8 @@ var rootCmd = &cobra.Command{
 		"\033[1;38;5;173mencrata\033[0m",
 		"\033[38;5;245mintelligence lookups from your terminal\033[0m",
 		"\033[38;5;173mencrata config set-key\033[0m <your-api-key>",
-		"\033[38;5;173mencrata email\033[0m user@example.com",
-		"\033[38;5;173mencrata ip\033[0m 8.8.8.8",
+		"\033[38;5;173mencrata email validity\033[0m user@example.com",
+		"\033[38;5;173mencrata email bulk\033[0m emails.csv --out results.csv",
 		"\033[38;5;109mhttps://docs.encrata.com\033[0m"),
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -52,6 +53,11 @@ func Execute() error {
 			output.Error("Aborted.")
 			return nil
 		}
+		// A detected breach is a successful check with a non-zero exit code;
+		// the verdict is already rendered, so don't print an error banner.
+		if errors.Is(err, errBreachDetected) {
+			return err
+		}
 		output.Error(err.Error())
 	}
 	return err
@@ -64,28 +70,13 @@ func init() {
 	rootCmd.PersistentFlags().String("base-url", "", "API base URL (overrides config/env)")
 
 	rootCmd.AddCommand(emailCmd)
-	rootCmd.AddCommand(phoneCmd)
-	rootCmd.AddCommand(companyCmd)
-	rootCmd.AddCommand(domainCmd)
-	rootCmd.AddCommand(ipCmd)
-	rootCmd.AddCommand(googleCmd)
-	rootCmd.AddCommand(darkwebCmd)
-	rootCmd.AddCommand(scrapeCmd)
-	rootCmd.AddCommand(extractCmd)
-	rootCmd.AddCommand(screenshotCmd)
-	rootCmd.AddCommand(faceCmd)
-	rootCmd.AddCommand(validateCmd)
-	rootCmd.AddCommand(breachesCmd)
-	rootCmd.AddCommand(bulkCmd)
-	rootCmd.AddCommand(listsCmd)
-	rootCmd.AddCommand(monitorsCmd)
-	rootCmd.AddCommand(workflowsCmd)
+	rootCmd.AddCommand(passwordCmd)
 	rootCmd.AddCommand(keysCmd)
-	rootCmd.AddCommand(webhooksCmd)
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(updateCmd)
 	rootCmd.AddCommand(jobsCmd)
+	rootCmd.AddCommand(listsCmd)
 
 	improveArgErrors(rootCmd)
 }

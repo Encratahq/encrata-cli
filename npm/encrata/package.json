@@ -1,6 +1,6 @@
 {
   "name": "encrata-cli",
-  "version": "0.4.7",
+  "version": "0.5.0",
   "description": "Encrata CLI — intelligence lookups from your terminal",
   "bin": {
     "encrata": "bin/encrata"
