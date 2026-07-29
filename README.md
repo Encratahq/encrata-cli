@@ -239,7 +239,7 @@ encrata update
 | `email validity` | Deliverability verdict (valid/invalid/catch-all/risky) **+ full report** | 1/email |
 | `email verify` | Quick deep-SMTP yes/no — is the mailbox reachable? | Free |
 | `email enrich` | Validity **+ company & domain** signals (the `validity --full` data) | 1/email |
-| `email identity` | The **person** — name, role, company, socials, breaches | 1/email |
+| `email identity` | The **person** — name, role, company, socials, breaches | 1000/email |
 | `email breaches` | Data-breach exposure for an address | 1/email |
 | `email bulk` | Validate a whole file/list (= `email validity --bulk`) | 1/email |
 
