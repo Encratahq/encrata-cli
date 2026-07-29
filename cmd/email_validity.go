@@ -6,11 +6,24 @@ import (
 )
 
 var emailValidityCmd = &cobra.Command{
-	Use:   "validity [email]",
-	Short: "Check whether an email is valid and deliverable",
-	Long:  "Validate a single email address. Charges 1 credit on success; invalid or failed checks are not charged.",
-	Args:  cobra.ExactArgs(1),
+	Use:   "validity [email|file]",
+	Short: "Validate an email: valid/invalid/catch-all/risky + full report (1 credit)",
+	Long: `Validate a single email address, or a whole list with --bulk.
+
+Charges 1 credit on success; invalid or failed checks are not charged.
+
+Examples:
+  encrata email validity user@example.com
+  encrata email validity emails.csv --bulk
+  encrata email validity emails.csv --bulk --out results.csv --only valid`,
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if bulk, _ := cmd.Flags().GetBool("bulk"); bulk {
+			return runEmailBulk(cmd, args)
+		}
+		if len(args) != 1 {
+			return friendlyFormatError(cmd, "provide one email address, or use --bulk with a file")
+		}
 		full, _ := cmd.Flags().GetBool("full")
 		return emailLookup(cmd, args[0], "Validity", "Checking validity...",
 			(*api.Client).EmailValidity,
@@ -21,6 +34,8 @@ var emailValidityCmd = &cobra.Command{
 
 func init() {
 	emailValidityCmd.Flags().Bool("full", false, "Show all validity sections")
+	emailValidityCmd.Flags().Bool("bulk", false, "Validate a file (or - for STDIN) of emails")
+	registerBulkFlags(emailValidityCmd, false)
 }
 
 // renderValidity returns a renderer for the validity response. Compact by

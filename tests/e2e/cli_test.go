@@ -170,7 +170,7 @@ func exitCode(t *testing.T, err error) int {
 	return -1
 }
 
-func TestPasswordSingleBreachedExitsOne(t *testing.T) {
+func TestPasswordSingleBreachedExitCodes(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/password/breaches" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
@@ -196,9 +196,15 @@ func TestPasswordSingleBreachedExitsOne(t *testing.T) {
 		"ENCRATA_BASE_URL": server.URL,
 	}
 
+	// Default: a breach does NOT fail the command (findings are opt-in).
 	out, err := runCLI(t, env, "password", "password")
-	if code := exitCode(t, err); code != 1 {
-		t.Fatalf("expected exit code 1 on breach, got %d\n%s", code, out)
+	if code := exitCode(t, err); code != 0 {
+		t.Fatalf("expected exit code 0 on breach without --fail-on-finding, got %d\n%s", code, out)
+	}
+	// With --fail-on-finding: a breach exits with code 2.
+	out, err = runCLI(t, env, "password", "password", "--fail-on-finding")
+	if code := exitCode(t, err); code != 2 {
+		t.Fatalf("expected exit code 2 on breach with --fail-on-finding, got %d\n%s", code, out)
 	}
 	for _, want := range []string{"BREACHED", "12,345", "5BAA6"} {
 		if !strings.Contains(out, want) {
@@ -241,9 +247,9 @@ func TestPasswordJSONModePassesThrough(t *testing.T) {
 		"ENCRATA_BASE_URL": server.URL,
 	}
 
-	out, err := runCLI(t, env, "password", "password", "--json")
-	if code := exitCode(t, err); code != 1 {
-		t.Fatalf("expected exit code 1 on breach, got %d\n%s", code, out)
+	out, err := runCLI(t, env, "password", "password", "--json", "--fail-on-finding")
+	if code := exitCode(t, err); code != 2 {
+		t.Fatalf("expected exit code 2 on breach with --fail-on-finding, got %d\n%s", code, out)
 	}
 	// JSON mode should emit the raw fields, not the table verdict line.
 	for _, want := range []string{`"prefix": "5BAA6"`, `"found": true`, `"count": 42`} {
@@ -286,9 +292,9 @@ func TestPasswordBulkFromFileDedupes(t *testing.T) {
 		"ENCRATA_BASE_URL": server.URL,
 	}
 
-	out, err := runCLI(t, env, "password", "--file", pwFile)
-	if code := exitCode(t, err); code != 1 {
-		t.Fatalf("expected exit code 1 (breach in batch), got %d\n%s", code, out)
+	out, err := runCLI(t, env, "password", "--file", pwFile, "--fail-on-finding")
+	if code := exitCode(t, err); code != 2 {
+		t.Fatalf("expected exit code 2 (breach in batch) with --fail-on-finding, got %d\n%s", code, out)
 	}
 	if len(gotHashes) != 2 {
 		t.Fatalf("expected 2 de-duplicated hashes, got %d: %v", len(gotHashes), gotHashes)
@@ -742,7 +748,7 @@ func TestJobsBulkIdentityJSON(t *testing.T) {
 	defer server.Close()
 
 	env := map[string]string{"ENCRATA_API_KEY": "test-key", "ENCRATA_BASE_URL": server.URL}
-	out, err := runCLI(t, env, "jobs", "bulk_email_identity", "--emails", "one@example.com", "--emails", "two@example.com", "--json")
+	out, err := runCLI(t, env, "jobs", "bulk-email-identity", "--emails", "one@example.com", "--emails", "two@example.com", "--json")
 	if err != nil {
 		t.Fatalf("bulk_email_identity failed: %v\n%s", err, out)
 	}
@@ -768,7 +774,7 @@ func TestJobsGetEmailJobResultsPasswordBreached(t *testing.T) {
 	defer server.Close()
 
 	env := map[string]string{"ENCRATA_API_KEY": "test-key", "ENCRATA_BASE_URL": server.URL}
-	out, err := runCLI(t, env, "jobs", "get_email_job_results", "job_p1", "--job-type", "password", "--page", "2", "--page-size", "100", "--breached", "--json")
+	out, err := runCLI(t, env, "jobs", "get-email-job-results", "job_p1", "--job-type", "password", "--page", "2", "--page-size", "100", "--breached", "--json")
 	if err != nil {
 		t.Fatalf("get_email_job_results failed: %v\n%s", err, out)
 	}
@@ -794,7 +800,7 @@ func TestJobsRetryIdentityJSON(t *testing.T) {
 	defer server.Close()
 
 	env := map[string]string{"ENCRATA_API_KEY": "test-key", "ENCRATA_BASE_URL": server.URL}
-	out, err := runCLI(t, env, "jobs", "retry_email_job", "job_i1", "--job-type", "identity", "--json")
+	out, err := runCLI(t, env, "jobs", "retry-email-job", "job_i1", "--job-type", "identity", "--json")
 	if err != nil {
 		t.Fatalf("retry_email_job failed: %v\n%s", err, out)
 	}

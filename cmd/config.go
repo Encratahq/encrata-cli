@@ -62,6 +62,33 @@ var setURLCmd = &cobra.Command{
 	},
 }
 
+var unsetConfigCmd = &cobra.Command{
+	Use:   "unset [key]",
+	Short: "Clear a configuration value",
+	Long: `Clear a saved configuration value and revert it to its default.
+
+Keys: api-key (removes the key), base-url (reverts to the default),
+output (reverts to table).`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		switch strings.ToLower(strings.TrimSpace(args[0])) {
+		case "api-key", "key":
+			cfg.APIKey = ""
+		case "base-url", "url":
+			cfg.BaseURL = config.DefaultBaseURL
+		case "output":
+			cfg.Output = "table"
+		default:
+			return fmt.Errorf("unknown key %q; use one of: api-key, base-url, output", args[0])
+		}
+		if err := config.Save(cfg); err != nil {
+			return fmt.Errorf("failed to save config: %w", err)
+		}
+		output.Success.Printf("  ✓ Cleared %s\n", args[0])
+		return nil
+	},
+}
+
 var showConfigCmd = &cobra.Command{
 	Use:   "show",
 	Short: "Show current configuration",
@@ -87,5 +114,6 @@ var showConfigCmd = &cobra.Command{
 func init() {
 	configCmd.AddCommand(setKeyCmd)
 	configCmd.AddCommand(setURLCmd)
+	configCmd.AddCommand(unsetConfigCmd)
 	configCmd.AddCommand(showConfigCmd)
 }

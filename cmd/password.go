@@ -29,7 +29,8 @@ With no argument the password is read interactively without echo, so it never
 lands in your shell history. Use --file or --stdin to check many passwords at
 once (one per line, de-duplicated, max 1000).
 
-Exit codes: 0 = nothing breached, 1 = at least one password breached.
+Exit codes: by default the command exits 0 even when a breach is found. Pass
+--fail-on-finding to exit 2 when any password is breached (3 = auth, 4 = credits).
 
 Examples:
   encrata password
@@ -43,6 +44,15 @@ Examples:
 func init() {
 	passwordCmd.Flags().String("file", "", "Check passwords from a file (one per line)")
 	passwordCmd.Flags().Bool("stdin", false, "Read passwords from STDIN (one per line)")
+	passwordCmd.Flags().Bool("fail-on-finding", false, "Exit with code 2 if any password is found in a breach")
+}
+
+// failOnFinding reports whether the command should exit non-zero (code 2) when
+// a breach/finding is detected. Findings are opt-in so a clean scan and a
+// broken run are never confused.
+func failOnFinding(cmd *cobra.Command) bool {
+	v, _ := cmd.Flags().GetBool("fail-on-finding")
+	return v
 }
 
 func runPassword(cmd *cobra.Command, args []string) error {
@@ -107,7 +117,7 @@ func runPasswordSingle(cmd *cobra.Command, args []string) error {
 		renderPasswordSingle(result)
 	}
 
-	if result.Breach() {
+	if result.Breach() && failOnFinding(cmd) {
 		return errBreachDetected
 	}
 	return nil
@@ -163,7 +173,7 @@ func runPasswordBulk(cmd *cobra.Command, file string, useStdin bool) error {
 		renderPasswordBulk(result)
 	}
 
-	if result.Breach() {
+	if result.Breach() && failOnFinding(cmd) {
 		return errBreachDetected
 	}
 	return nil

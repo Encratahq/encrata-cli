@@ -5,7 +5,7 @@ const path = require("path");
 const https = require("https");
 const { execSync } = require("child_process");
 
-const VERSION = "0.6.0";
+const VERSION = "0.7.0";
 const REPO = "Encratahq/encrata-cli";
 
 const PLATFORM_MAP = {

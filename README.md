@@ -73,21 +73,61 @@ encrata email enrich user@example.com --json
 
 ## Authentication
 
+Fastest path — `login` saves your key and verifies it:
+
+```bash
+encrata login enc_live_xxxxxxxx     # or just: encrata login  (prompts)
+encrata whoami                      # confirm account, plan, credits, workspace
+encrata logout                      # clear the saved key
+```
+
 The CLI resolves your API key using this priority chain:
 
 | Priority | Source | How to set |
 | -------- | ------ | ---------- |
 | 1 | `--api-key` flag | `encrata email validity user@example.com --api-key YOUR_API_KEY` |
 | 2 | `ENCRATA_API_KEY` env var | `export ENCRATA_API_KEY=YOUR_API_KEY` |
-| 3 | Config file | `encrata config set-key YOUR_API_KEY` |
+| 3 | Config file | `encrata login YOUR_API_KEY` (or `config set-key`) |
 
 If no key is found, protected commands return an API key error.
 
-Config is saved to:
+Config is saved to `~/.encrata/config.yaml` (written `0600`).
 
-```text
-~/.encrata/config.yaml
-```
+### `encrata login` / `logout` / `whoami`
+
+| Command | Description |
+| ------- | ----------- |
+| `login [api-key]` | Save the key and verify it against the API (prompts if omitted) |
+| `logout` | Clear the saved key (the `ENCRATA_API_KEY` env var still applies) |
+| `whoami` | Show the authenticated email, plan, remaining credits, role, and active workspace |
+
+---
+
+## Conventions
+
+Behavior is consistent across every command:
+
+| Situation | Output |
+| --------- | ------ |
+| Single lookup | Human-readable card (key/value) on **stdout** |
+| Bulk (`--bulk`) | Progress bar + **summary counts** (not a per-row dump) |
+| `--json` | Raw API JSON on **stdout** (full rows for bulk) |
+| `--out file` | Results written to `.csv` / `.xlsx` / `.json` |
+| Errors & notices | **stderr** (so stdout stays pipe-clean) |
+
+Global flags (all commands): `--json`, `--api-key`, `--base-url`, `--quiet`,
+`--no-color` (honors `NO_COLOR`), `--timeout <secs>`. The spinner auto-disables
+when output is not a terminal.
+
+### Exit codes
+
+| Code | Meaning |
+| ---- | ------- |
+| `0` | Success (or a finding when `--fail-on-finding` is not set) |
+| `1` | Operational error (bad usage, network, or server) |
+| `2` | A finding was detected — breach/leak — only with `--fail-on-finding` |
+| `3` | Authentication failed |
+| `4` | Insufficient credits |
 
 ---
 
@@ -117,6 +157,16 @@ Show the current CLI configuration.
 encrata config show
 ```
 
+### `encrata config unset`
+
+Clear a saved value and revert it to its default.
+
+```bash
+encrata config unset api-key     # remove the saved key
+encrata config unset base-url    # revert to the default API URL
+encrata config unset output      # revert to table output
+```
+
 ### Global options
 
 | Flag | Description |
@@ -124,6 +174,14 @@ encrata config show
 | `--json` | Print raw JSON output |
 | `--api-key` | Override the saved API key |
 | `--base-url` | Override the saved API base URL |
+| `--quiet` | Suppress decorative output (headers, spinner); results still print |
+| `--no-color` | Disable colored output (also honors the `NO_COLOR` env var) |
+| `--timeout` | Per-request timeout in seconds (0 = default 90s) |
+
+Environment variables: `ENCRATA_API_KEY`, `ENCRATA_BASE_URL`, and `NO_COLOR`
+are all honored. The config file (`~/.encrata/config.yaml`) is written with
+`0600` permissions since it stores the API key. The spinner auto-disables when
+output is not a terminal.
 
 ---
 
@@ -144,6 +202,9 @@ Examples:
 encrata email --help
 encrata email bulk --help
 encrata jobs --help
+encrata keys --help
+encrata webhooks --help
+encrata workspace --help
 encrata lists --help
 ```
 
@@ -171,14 +232,39 @@ encrata update
 
 ---
 
+### Which email command?
+
+| Command | Use it for | Credits |
+| ------- | ---------- | ------- |
+| `email validity` | Deliverability verdict (valid/invalid/catch-all/risky) **+ full report** | 1/email |
+| `email verify` | Quick deep-SMTP yes/no — is the mailbox reachable? | Free |
+| `email enrich` | Validity **+ company & domain** signals (the `validity --full` data) | 1/email |
+| `email identity` | The **person** — name, role, company, socials, breaches | 1/email |
+| `email breaches` | Data-breach exposure for an address | 1/email |
+| `email bulk` | Validate a whole file/list (= `email validity --bulk`) | 1/email |
+
+Every verb runs on one address, or on a file/STDIN list with `--bulk`.
+
+---
+
 ### `encrata email validity`
 
-Check whether a single email address is valid and deliverable.
+Check whether a single email address is valid and deliverable. Returns
+`valid` / `invalid` / `catch-all` / `risky` plus confidence, domain trust,
+disposable/role flags, provider and SMTP detail.
 
 ```bash
 encrata email validity user@example.com
 encrata email validity user@example.com --json
+
+# Validate a whole file (or STDIN) — same engine as `email bulk`
+encrata email validity emails.csv --bulk
+encrata email validity emails.csv --bulk --out results.csv --only valid
 ```
+
+Bulk mode (`--bulk`) is the uniform spelling of `email bulk` and takes the same
+flags: `--out`, `--format`, `--only valid|invalid|found`, `--stream`, `--job`,
+`--enrich`, `--concurrency`, `--columns`.
 
 ---
 
@@ -195,29 +281,84 @@ encrata email enrich user@example.com --json
 
 ### `encrata email identity`
 
-Resolve the identity and social profiles behind an email address.
+Resolve the identity and social profiles behind an email address. Pass a single
+email, or use `--bulk` with a file (or `-` for STDIN) to resolve a whole list
+concurrently.
 
 ```bash
+# Single email
 encrata email identity user@example.com
 encrata email identity user@example.com --json
+
+# Bulk from a file (or STDIN)
+encrata email identity emails.csv --bulk
+encrata email identity emails.csv --bulk --concurrency 16 --out people.csv
+encrata email identity emails.csv --bulk --only found --out people.xlsx
 ```
+
+Bulk options: `--bulk`, `--concurrency` (default 8), `--out` (`.csv`/`.xlsx`/`.json`),
+`--format`, `--only found`. Bulk exports flatten to `email`, `found`, `name`,
+`company`, `job_role`, `location`; `--format json` writes the raw objects. For
+very large lists, prefer the async `identity-jobs` surface.
 
 ---
 
 ### `encrata email breaches`
 
-Check whether an email appears in known data breaches.
+Check whether an email appears in known data breaches. Pass a single email to
+check it, or use `--bulk` with a CSV/text file (or `-` for STDIN) to stream a
+whole list with a live progress bar.
 
 ```bash
+# Single email
 encrata email breaches user@example.com
 encrata email breaches user@example.com --json
+
+# Bulk from a file (or STDIN)
+encrata email breaches emails.csv --bulk
+cat emails.csv | encrata email breaches - --bulk
+
+# Bulk with an export
+encrata email breaches emails.csv --bulk --out breaches.csv
+encrata email breaches emails.csv --bulk --out breaches.xlsx
+encrata email breaches emails.csv --bulk --format json
 ```
+
+Options:
+
+| Flag | Description |
+| ---- | ----------- |
+| `--full` | Show exposed data and registered services (single-email mode) |
+| `--bulk` | Check a file (or `-` for STDIN) of emails via streaming |
+| `--out` | Write bulk results to a file (`.csv`, `.xlsx`, or `.json`) |
+| `--format` | Bulk export format: `csv`, `xlsx`, or `json` (default: inferred from `--out`) |
+| `--only` | Export only matching rows: `breached` |
+| `--fail-on-finding` | Exit with code 2 if any email is breached (otherwise exit 0) |
+| `--json` | Print raw JSON output |
+
+Bulk exports flatten each row to `email`, `breached`, `breach_count`, and
+`breaches` (a ` | `-joined list of breach names); `--format json` writes the raw,
+nested result objects instead.
+
+Exit codes (usable as a CI / sign-up guard, mirroring `encrata password`):
+
+| Code | Meaning |
+| ---- | ------- |
+| `0` | Success — or a breach was found but `--fail-on-finding` was not set |
+| `1` | Operational error (network, validation, or server) |
+| `2` | A breach was found (only with `--fail-on-finding`) |
+| `3` | Authentication failed |
+| `4` | Insufficient credits |
 
 ---
 
 ### `encrata email verify`
 
-Perform a deep SMTP verification of an email address.
+Deep SMTP-level deliverability check of a single address — connects to the mail
+server to confirm the mailbox. **Free.** Use `verify` for a quick
+deliverable/undeliverable answer; use `validity` when you also need the full
+report (confidence, domain trust, disposable/role flags, provider, SMTP detail
+— costs 1 credit).
 
 ```bash
 encrata email verify user@example.com
@@ -256,6 +397,7 @@ Options:
 | ---- | ----------- |
 | `--file` | Check passwords from a file (one per line) |
 | `--stdin` | Read passwords from STDIN (one per line) |
+| `--fail-on-finding` | Exit with code 2 if any password is breached (otherwise exit 0) |
 | `--json` | Print raw JSON output (defaults to a formatted table) |
 
 Pricing: **1 credit per unique password** (single = 1; bulk = number of unique
@@ -265,9 +407,11 @@ Exit codes (usable as a CI / sign-up guard):
 
 | Code | Meaning |
 | ---- | ------- |
-| `0` | Check succeeded and nothing was breached |
-| `1` | Check succeeded and at least one password was breached |
-| non-zero | Auth, credit, network, or validation error |
+| `0` | Success — or a breach was found but `--fail-on-finding` was not set |
+| `1` | Operational error (network, validation, or server) |
+| `2` | A breach was found (only with `--fail-on-finding`) |
+| `3` | Authentication failed |
+| `4` | Insufficient credits |
 
 ---
 
@@ -287,11 +431,14 @@ breaches, etc.) is populated — the same data as `email validity --full`.
 encrata email bulk emails.csv
 encrata email bulk emails.csv --out results.csv
 encrata email bulk emails.csv --enrich --out results.csv
-encrata email bulk emails.csv --enrich --concurrency 16 --valid-only --out valid.csv
+encrata email bulk emails.csv --enrich --concurrency 16 --only valid --out valid.csv
 encrata email bulk emails.csv --out results.xlsx --columns email,status,trust_grade
 encrata email bulk emails.csv --job --out results.json --format json
 cat emails.csv | encrata email bulk - --stream
 ```
+
+> `email bulk emails.csv` and `email validity emails.csv --bulk` are equivalent
+> — same engine and flags. Use whichever reads better.
 
 Options:
 
@@ -304,8 +451,7 @@ Options:
 | `--out` | Write results to a file (`.csv`, `.xlsx`, or `.json`) |
 | `--format` | Export format: `csv`, `xlsx`, or `json` (default: inferred from `--out`) |
 | `--columns` | Subset of columns to export (`email`, `status`, `reason` always included) |
-| `--valid-only` | Export only rows whose status is valid |
-| `--found-only` | Skip rows that carry no enrichment data |
+| `--only` | Export only matching rows: `valid`, `invalid`, or `found` |
 
 Batches larger than 1,000 emails automatically switch to job mode unless
 `--stream` is set. The lean path bills 1 credit per successful unique email;
@@ -334,102 +480,53 @@ writes the raw, nested result objects (unflattened) instead of a flat table.
 
 ### `encrata jobs`
 
-Manage asynchronous email jobs. Use these for large inputs that the backend
-processes in the background and returns as downloadable results. The command
-covers three job types — `validity`, `identity`, and `password` — plus the
-underlying bulk-job registry.
-
-#### Validity jobs (file-based)
+Manage asynchronous jobs for large inputs the backend processes in the
+background. **One namespace, three job types** selected with `--type`
+(`validity` is the default; also `identity` and `password`).
 
 ```bash
+# Validity (default) — from a file or STDIN
 encrata jobs create emails.csv
 encrata jobs list
 encrata jobs status JOB_ID
 encrata jobs results JOB_ID --status invalid
 encrata jobs download JOB_ID --format csv --out results.csv
 encrata jobs cancel JOB_ID
+encrata jobs retry JOB_ID
+
+# Identity — same verbs, add --type identity
+encrata jobs create emails.csv --type identity
+encrata jobs results JOB_ID --type identity --found-only
+encrata jobs download JOB_ID --type identity --out people.csv
+
+# Password — hashes only, never plaintext
+encrata jobs create --type password --sha1-file hashes.txt
+encrata jobs create --type password --password-file passwords.txt   # hashed locally
+encrata jobs results JOB_ID --type password --breached
 ```
+
+Every verb (`create`, `list`, `status`, `results`, `download`, `cancel`,
+`retry`) accepts `--type validity|identity|password`.
 
 Options:
 
 | Command | Flag | Description |
 | ------- | ---- | ----------- |
-| `results` | `--status` | Filter results by per-row status (e.g. `valid`, `invalid`) |
-| `results` | `--page` | Result page to fetch |
-| `download` | `--format` | Download format: `csv`, `xlsx`, or `json` |
-| `download` | `--status` | Filter rows by status |
-| `download` | `--valid-only` | Download only rows whose status is valid |
+| all | `--type` | Job type: `validity` (default), `identity`, `password` |
+| `create` (password) | `--sha1s` / `--sha1-file` / `--password-file` | Hash sources (plaintext hashed locally, never sent) |
+| `create` | `--file-name` | Optional display name |
+| `results` | `--status` | Validity: filter by per-row status |
+| `results` | `--page` / `--page-size` | Pagination |
+| `results` | `--found-only` | Identity: only enriched rows |
+| `results` | `--breached` | Password: only breached rows |
+| `download` | `--format` | Validity: `csv`, `xlsx`, or `json` |
+| `download` | `--valid-only` / `--found-only` / `--breached` | Per-type row filters |
 | `download` | `--out` | Write to a file instead of stdout |
+| `retry` | | Re-drive dead-lettered chunks (validity/identity; password has no retry) |
 
-#### Create async jobs (inline input)
-
-Create validity, identity, or password jobs directly from inline values or a
-file — no separate upload step required.
-
-```bash
-# Validity job from inline emails
-encrata jobs bulk_validate_emails --emails a@example.com --emails b@example.com
-
-# Identity job from a file
-encrata jobs bulk_email_identity --file emails.csv --file-name "prospects"
-
-# Password breach job from SHA-1 hashes (hashes only — never plaintext)
-encrata jobs bulk_password_breaches --sha1s 5BAA61E4C9B93F3F0682250B6CF8331B7EE68FD8
-encrata jobs bulk_password_breaches --sha1-file hashes.txt
-```
-
-Options:
-
-| Command | Flag | Description |
-| ------- | ---- | ----------- |
-| `bulk_validate_emails` | `--emails` | Inline email addresses (repeatable) |
-| `bulk_validate_emails` | `--file` | Read emails from a file |
-| `bulk_validate_emails` | `--file-name` | Optional display name for the job |
-| `bulk_validate_emails` | `--batch-id` | Optional grouping ID across related jobs |
-| `bulk_email_identity` | `--emails` / `--file` / `--file-name` | Same inputs as above |
-| `bulk_password_breaches` | `--sha1s` | Inline SHA-1 hashes (40-char hex, repeatable) |
-| `bulk_password_breaches` | `--sha1-file` | Read SHA-1 hashes from a file |
-| `bulk_password_breaches` | `--file-name` | Optional display name for the job |
-
-Only UPPER-CASE hex SHA-1 hashes are transmitted for password jobs — plaintext
-passwords are never sent.
-
-#### Track and manage any job type
-
-These commands accept `--job-type validity|identity|password` (default
-`validity`) and operate on a job ID.
-
-```bash
-encrata jobs get_email_job_status  JOB_ID --job-type identity
-encrata jobs get_email_job_results JOB_ID --job-type password --page 1 --page-size 100 --breached
-encrata jobs download_email_job    JOB_ID --job-type identity --found-only --out out.csv
-encrata jobs cancel_email_job      JOB_ID --job-type validity
-encrata jobs retry_email_job       JOB_ID --job-type validity
-```
-
-Options:
-
-| Command | Flag | Description |
-| ------- | ---- | ----------- |
-| `get_email_job_results` | `--page` | 1-based page number |
-| `get_email_job_results` | `--page-size` | Results per page |
-| `get_email_job_results` | `--breached` | Password: breached only; identity: found only |
-| `get_email_job_results` | `--found-only` | Identity: found rows only |
-| `download_email_job` | `--format` | Download format: `csv` |
-| `download_email_job` | `--status` | Validity-only per-row status filter |
-| `download_email_job` | `--breached` | Password: breached only; identity: found only |
-| `download_email_job` | `--found-only` | Identity: found rows only |
-| `download_email_job` | `--out` | Write to a file instead of stdout |
-
-#### Bulk-job registry
-
-Inspect and manage the underlying bulk-job records.
-
-```bash
-encrata jobs list_bulk_jobs
-encrata jobs get_bulk_job JOB_ID
-encrata jobs cancel_bulk_job JOB_ID
-```
+> **Deprecated:** the separate `identity-jobs` / `password-jobs` groups and the
+> MCP-style names (`bulk-validate-emails`, `get-email-job-status`, …) still work
+> but are hidden — use `jobs <verb> --type` instead.
 
 ---
 
@@ -474,14 +571,144 @@ Options:
 
 ### `encrata keys`
 
-Create, list, and revoke API keys.
+Create, list, rename, enable/disable, cap, and revoke API keys.
 
 ```bash
 encrata keys ls
 encrata keys create "CI key"
+encrata keys rename KEY_ID "Prod key"
+encrata keys enable KEY_ID
+encrata keys disable KEY_ID
+encrata keys limit KEY_ID --credits 5000
+encrata keys limit KEY_ID --unlimited
 encrata keys revoke KEY_ID
 encrata keys revoke KEY_ID --permanent
 ```
+
+Subcommands:
+
+| Command | Description |
+| ------- | ----------- |
+| `ls` | List API keys with ID, name, prefix, status, credits used, and limit |
+| `create` | Create a new API key (the full key is shown once) |
+| `rename` | Rename a key: `keys rename <id> <new-name>` |
+| `enable` | Re-enable a disabled key |
+| `disable` | Disable a key without deleting it (reversible with `enable`) |
+| `limit` | Set (`--credits <N>`) or clear (`--unlimited`) a key's credit cap |
+| `revoke` | Disable a key; add `--permanent` to delete it for good |
+
+Options:
+
+| Command | Flag | Description |
+| ------- | ---- | ----------- |
+| `limit` | `--credits` | Credit cap for the key (must be >= 0) |
+| `limit` | `--unlimited` | Remove the credit cap (unlimited usage) |
+| `revoke` | `--permanent` | Permanently delete the key instead of disabling it |
+
+---
+
+### `encrata webhooks`
+
+Register HTTPS endpoints that receive real-time event notifications from your
+workspace. Deliveries are signed with HMAC-SHA256 so your receiver can verify
+them.
+
+```bash
+encrata webhooks create https://example.com/hook --events lookup.completed,credits.low
+encrata webhooks list
+encrata webhooks update WEBHOOK_ID --disable
+encrata webhooks test WEBHOOK_ID
+encrata webhooks deliveries WEBHOOK_ID --limit 20
+encrata webhooks delete WEBHOOK_ID
+```
+
+Subcommands: `list`, `create`, `update`, `delete`, `test`, `deliveries`.
+
+Valid event types:
+
+```text
+lookup.completed, apikey.created, apikey.revoked, credits.low, credits.exhausted
+```
+
+Options:
+
+| Command | Flag | Description |
+| ------- | ---- | ----------- |
+| `create` | `--events` | Events to subscribe to (comma-separated, required) |
+| `create` | `--description` | Optional description |
+| `update` | `--url` | New HTTPS endpoint URL |
+| `update` | `--events` | Replace subscribed events (comma-separated) |
+| `update` | `--description` | New description |
+| `update` | `--enable` / `--disable` | Activate or deactivate the webhook |
+| `delete` | `--yes` | Skip the confirmation prompt |
+| `deliveries` | `--limit` | Maximum deliveries to show (default 20) |
+
+`create` returns the signing **secret once** — store it as `ENCRATA_WEBHOOK_SECRET`
+in your receiver to verify the `X-Encrata-Signature` header. URLs must use HTTPS.
+Managing webhooks requires a selected workspace.
+
+---
+
+### `encrata workspace`
+
+Manage workspaces and their members (alias: `ws`). Member, `update`, and
+`delete` operations act on your **current (active) workspace**, which is tracked
+server-side — run `workspace switch <id>` first to change it.
+
+```bash
+encrata workspace list
+encrata workspace create "Acme Inc" --slug acme
+encrata workspace switch WORKSPACE_ID
+encrata workspace update --name "Acme Corp" --slug acme
+encrata workspace delete            # deletes the CURRENT workspace (admin only)
+
+encrata workspace members
+encrata workspace members invite teammate@acme.com --role tech
+encrata workspace members set-role MEMBER_ID --role admin
+encrata workspace members remove MEMBER_ID
+```
+
+Subcommands: `list`, `create`, `switch`, `update`, `delete`, and
+`members` (`list`, `invite`, `set-role`, `remove`).
+
+Valid member roles: `admin`, `tech`, `readonly` (the creator is the owner).
+
+Options:
+
+| Command | Flag | Description |
+| ------- | ---- | ----------- |
+| `create` | `--slug` | Custom slug (auto-generated when omitted) |
+| `create` | `--logo-url` | Logo URL |
+| `update` | `--name` | New name (**required**) |
+| `update` | `--slug` | New slug (regenerated from name if omitted) |
+| `update` | `--logo-url` | New logo URL |
+| `update` | `--id` | Target workspace ID (defaults to current) |
+| `delete` | `--yes` | Skip the confirmation prompt |
+| `members invite` | `--role` | `admin`, `tech`, or `readonly` (default `readonly`) |
+| `members set-role` | `--role` | New role for the member |
+| `members remove` | `--yes` | Skip the confirmation prompt |
+
+`update`, `delete`, and member changes are **admin-only** and always target your
+active workspace. Destructive actions (`delete`, `members remove`) confirm first
+unless `--yes`.
+
+> The `workspace` command is also available as **`ws`** — e.g. `ws list`,
+> `ws switch <id>`, `ws members list`.
+
+---
+
+## Shell completion
+
+Generate a completion script for your shell:
+
+```bash
+encrata completion bash   > /etc/bash_completion.d/encrata
+encrata completion zsh    > "${fpath[1]}/_encrata"
+encrata completion fish   > ~/.config/fish/completions/encrata.fish
+encrata completion powershell | Out-String | Invoke-Expression
+```
+
+Run `encrata completion --help` for shell-specific install instructions.
 
 ---
 
@@ -495,11 +722,15 @@ de-duplicated, and invalid or failed checks are not charged.
 | `email validity` | 1 credit per successful email |
 | `email enrich` | 1 credit per successful email |
 | `email identity` | 1 credit per successful email |
-| `email breaches` | 1 credit per successful email |
+| `email breaches` | 1 credit per successful email (single or `--bulk`) |
 | `email verify` | 1 credit per successful email |
 | `email bulk` | 1 credit per successful unique email |
-| `jobs` | 1 credit per successful unique email |
+| `jobs` (validity / identity) | 1 credit per successful unique email |
+| `jobs --type password` | 1 credit per unique password hash |
 | `lists` | Free — list management does not consume credits |
+| `keys` | Free — key management does not consume credits |
+| `webhooks` | Free — webhook management does not consume credits |
+| `workspace` | Free — workspace management does not consume credits |
 
 ---
 

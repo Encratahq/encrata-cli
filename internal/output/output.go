@@ -10,21 +10,45 @@ import (
 
 var lastError string
 
+// colorEnabled gates ANSI color. Honors the NO_COLOR convention by default and
+// is overridable via SetColor (e.g. the --no-color flag).
+var colorEnabled = os.Getenv("NO_COLOR") == ""
+
+// quiet suppresses decorative chrome (headers, banners, info lines, spinner).
+var quiet bool
+
+// SetColor enables or disables ANSI color output globally.
+func SetColor(enabled bool) { colorEnabled = enabled }
+
+// SetQuiet toggles suppression of decorative output (results still print).
+func SetQuiet(q bool) { quiet = q }
+
+// Quiet reports whether decorative output is suppressed.
+func Quiet() bool { return quiet }
+
+// colorize wraps s in an ANSI SGR code unless color is disabled.
+func colorize(code, s string) string {
+	if !colorEnabled {
+		return s
+	}
+	return "\033[" + code + "m" + s + "\033[0m"
+}
+
 // brandColor prints text in 256-color terracotta (closest to #cc785c)
 func brandColor(s string) string {
-	return fmt.Sprintf("\033[38;5;173m%s\033[0m", s)
+	return colorize("38;5;173", s)
 }
 
 func brandBold(s string) string {
-	return fmt.Sprintf("\033[1;38;5;173m%s\033[0m", s)
+	return colorize("1;38;5;173", s)
 }
 
 func mutedColor(s string) string {
-	return fmt.Sprintf("\033[38;5;245m%s\033[0m", s)
+	return colorize("38;5;245", s)
 }
 
 func accentColor(s string) string {
-	return fmt.Sprintf("\033[38;5;109m%s\033[0m", s)
+	return colorize("38;5;109", s)
 }
 
 func JSON(data json.RawMessage) {
@@ -103,14 +127,20 @@ func Error(msg string) {
 		return
 	}
 	lastError = msg
-	fmt.Fprintf(os.Stderr, "  %s %s\n", "\033[1;31m✗\033[0m", msg)
+	fmt.Fprintf(os.Stderr, "  %s %s\n", colorize("1;31", "✗"), msg)
 }
 
 func Info(msg string) {
+	if quiet {
+		return
+	}
 	fmt.Printf("  %s %s\n", accentColor("▸"), msg)
 }
 
 func Header(title string) {
+	if quiet {
+		return
+	}
 	fmt.Println()
 	fmt.Printf("  %s\n", brandBold(title))
 	fmt.Println()
@@ -121,16 +151,19 @@ func SubHeader(title string) {
 }
 
 func SuccessMsg(msg string) {
-	fmt.Printf("  %s %s\n", "\033[1;32m✓\033[0m", msg)
+	fmt.Printf("  %s %s\n", colorize("1;32", "✓"), msg)
 }
 
 // SavedPath prints a "Result saved to" confirmation to STDERR so it never
 // corrupts JSON written to STDOUT (e.g. when piping `--json` to a file).
 func SavedPath(path string) {
-	fmt.Fprintf(os.Stderr, "  %s %s\n", "\033[1;32m✓\033[0m", "Result saved to: "+path)
+	fmt.Fprintf(os.Stderr, "  %s %s\n", colorize("1;32", "✓"), "Result saved to: "+path)
 }
 
 func Banner() {
+	if quiet {
+		return
+	}
 	fmt.Println()
 	fmt.Printf("  %s\n", brandBold("encrata"))
 	fmt.Printf("  %s\n", mutedColor("intelligence lookups from your terminal"))
@@ -162,9 +195,9 @@ func (p Printer) Sprintf(format string, a ...interface{}) string {
 var (
 	Brand   = Printer{style: brandColor}
 	Accent  = Printer{style: accentColor}
-	Bold    = Printer{style: func(s string) string { return fmt.Sprintf("\033[1m%s\033[0m", s) }}
+	Bold    = Printer{style: func(s string) string { return colorize("1", s) }}
 	Dim     = Printer{style: mutedColor}
-	Warn    = Printer{style: func(s string) string { return fmt.Sprintf("\033[1;33m%s\033[0m", s) }}
-	Success = Printer{style: func(s string) string { return fmt.Sprintf("\033[1;32m%s\033[0m", s) }}
-	Err     = Printer{style: func(s string) string { return fmt.Sprintf("\033[1;31m%s\033[0m", s) }}
+	Warn    = Printer{style: func(s string) string { return colorize("1;33", s) }}
+	Success = Printer{style: func(s string) string { return colorize("1;32", s) }}
+	Err     = Printer{style: func(s string) string { return colorize("1;31", s) }}
 )

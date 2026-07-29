@@ -12,14 +12,21 @@ import (
 
 var jobsCmd = &cobra.Command{
 	Use:   "jobs",
-	Short: "Manage async email validity jobs",
+	Short: "Manage async jobs (validity, identity, password)",
 }
 
 var jobsCreateCmd = &cobra.Command{
 	Use:   "create [file.csv]",
-	Short: "Create an async validity job from a file or STDIN",
+	Short: "Create an async job (validity, identity, or password) with --type",
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		jt, err := jobType(cmd)
+		if err != nil {
+			return err
+		}
+		if jt != "validity" {
+			return createNonValidityJob(cmd, args, jt)
+		}
 		path := ""
 		if len(args) == 1 {
 			path = args[0]
@@ -60,8 +67,15 @@ var jobsCreateCmd = &cobra.Command{
 
 var jobsListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List validity jobs",
+	Short: "List jobs (use --type for identity or password)",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		jt, err := jobType(cmd)
+		if err != nil {
+			return err
+		}
+		if jt != "validity" {
+			return listNonValidityJobs(cmd, jt)
+		}
 		client, err := newClient()
 		if err != nil {
 			return err
@@ -101,9 +115,16 @@ var jobsListCmd = &cobra.Command{
 
 var jobsStatusCmd = &cobra.Command{
 	Use:   "status [job-id]",
-	Short: "Show the status of a validity job",
+	Short: "Show the status of a job (use --type for identity or password)",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		jt, err := jobType(cmd)
+		if err != nil {
+			return err
+		}
+		if jt != "validity" {
+			return statusNonValidityJob(cmd, args, jt)
+		}
 		client, err := newClient()
 		if err != nil {
 			return err
@@ -132,9 +153,16 @@ var jobsStatusCmd = &cobra.Command{
 
 var jobsResultsCmd = &cobra.Command{
 	Use:   "results [job-id]",
-	Short: "Fetch results of a validity job",
+	Short: "Fetch results of a job (use --type for identity or password)",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		jt, err := jobType(cmd)
+		if err != nil {
+			return err
+		}
+		if jt != "validity" {
+			return resultsNonValidityJob(cmd, args, jt)
+		}
 		client, err := newClient()
 		if err != nil {
 			return err
@@ -170,9 +198,16 @@ var jobsResultsCmd = &cobra.Command{
 
 var jobsDownloadCmd = &cobra.Command{
 	Use:   "download [job-id]",
-	Short: "Download validity job results as CSV or JSON",
+	Short: "Download job results (use --type for identity or password)",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		jt, err := jobType(cmd)
+		if err != nil {
+			return err
+		}
+		if jt != "validity" {
+			return downloadNonValidityJob(cmd, args, jt)
+		}
 		client, err := newClient()
 		if err != nil {
 			return err
@@ -255,9 +290,16 @@ var jobsDownloadCmd = &cobra.Command{
 
 var jobsCancelCmd = &cobra.Command{
 	Use:   "cancel [job-id]",
-	Short: "Cancel a running validity job",
+	Short: "Cancel a running job (use --type for identity or password)",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		jt, err := jobType(cmd)
+		if err != nil {
+			return err
+		}
+		if jt != "validity" {
+			return cancelNonValidityJob(cmd, args, jt)
+		}
 		client, err := newClient()
 		if err != nil {
 			return err
@@ -274,6 +316,55 @@ var jobsCancelCmd = &cobra.Command{
 			return nil
 		}
 		output.SuccessMsg("Job cancelled: " + args[0])
+		return nil
+	},
+}
+
+var jobsRetryCmd = &cobra.Command{
+	Use:   "retry [job-id]",
+	Short: "Retry dead-lettered chunks of a job (validity or identity)",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		jt, err := jobType(cmd)
+		if err != nil {
+			return err
+		}
+		if jt != "validity" {
+			return retryNonValidityJob(cmd, args, jt)
+		}
+		client, err := newClient()
+		if err != nil {
+			return err
+		}
+		spinner := startSpinner("Retrying job...")
+		data, err := client.RetryValidityJob(cmd.Context(), args[0])
+		stopSpinner(spinner)
+		if err != nil {
+			output.Error(err.Error())
+			return err
+		}
+		if jsonMode() {
+			output.JSON(data)
+			return nil
+		}
+
+		requeued := 0
+		var m map[string]interface{}
+		if json.Unmarshal(data, &m) == nil {
+			requeued = getInt(m, "requeued")
+		}
+		output.SuccessMsg(fmt.Sprintf("Requeued %d %s", requeued, plural(requeued, "chunk", "chunks")))
+
+		statusData, err := client.GetValidityJob(cmd.Context(), args[0])
+		if err != nil {
+			return nil
+		}
+		job, err := api.ParseJob(statusData)
+		if err != nil {
+			return nil
+		}
+		output.Header("Validity Job: " + args[0])
+		printJob(job)
 		return nil
 	},
 }
@@ -304,6 +395,15 @@ func jobCreated(ts string) string {
 	return timeField(map[string]interface{}{"t": ts}, "t")
 }
 
+// coloredStatus returns a color-themed status label, falling back to the raw
+// string when no theme is defined for it.
+func coloredStatus(s string) string {
+	if c := statusColor(s); c != "" {
+		return c
+	}
+	return s
+}
+
 func filterRowsByStatus(rows []map[string]interface{}, status string) []map[string]interface{} {
 	want := strings.ToLower(strings.TrimSpace(status))
 	if want == "" {
@@ -321,13 +421,33 @@ func filterRowsByStatus(rows []map[string]interface{}, status string) []map[stri
 }
 
 func init() {
+	// --type selects the job kind on every unified command (default validity).
+	for _, c := range []*cobra.Command{
+		jobsCreateCmd, jobsListCmd, jobsStatusCmd, jobsResultsCmd,
+		jobsDownloadCmd, jobsCancelCmd, jobsRetryCmd,
+	} {
+		c.Flags().String("type", "validity", "Job type: validity | identity | password")
+	}
+
+	// create: identity/validity read emails from the file arg or STDIN;
+	// password reads hashes from these flags.
+	jobsCreateCmd.Flags().StringSlice("sha1s", nil, "Password: inline SHA-1 hashes (40-char hex)")
+	jobsCreateCmd.Flags().String("sha1-file", "", "Password: read SHA-1 hashes from a file")
+	jobsCreateCmd.Flags().String("password-file", "", "Password: read plaintext passwords from a file (hashed locally)")
+	jobsCreateCmd.Flags().String("file-name", "", "Optional display name for the job")
+
 	jobsResultsCmd.Flags().String("status", "", "Filter results by per-row status (e.g. valid, invalid)")
 	jobsResultsCmd.Flags().Int("page", 1, "Result page to fetch")
+	jobsResultsCmd.Flags().Int("page-size", 50, "Results per page (identity/password)")
+	jobsResultsCmd.Flags().Bool("found-only", false, "Identity: only rows with enrichment data")
+	jobsResultsCmd.Flags().Bool("breached", false, "Password: only breached rows")
 	jobsResultsCmd.Flags().StringSlice("fields", nil, "Extra columns from the validity schema (e.g. provider,mx)")
 
-	jobsDownloadCmd.Flags().String("format", "csv", "Download format: csv, xlsx, or json")
+	jobsDownloadCmd.Flags().String("format", "csv", "Download format: csv, xlsx, or json (validity)")
 	jobsDownloadCmd.Flags().String("status", "", "Filter rows by status")
 	jobsDownloadCmd.Flags().Bool("valid-only", false, "Download only rows whose status is valid")
+	jobsDownloadCmd.Flags().Bool("found-only", false, "Identity: only rows with enrichment data")
+	jobsDownloadCmd.Flags().Bool("breached", false, "Password: only breached rows")
 	jobsDownloadCmd.Flags().String("out", "", "Write to a file instead of stdout")
 
 	jobsCmd.AddCommand(
@@ -337,5 +457,6 @@ func init() {
 		jobsResultsCmd,
 		jobsDownloadCmd,
 		jobsCancelCmd,
+		jobsRetryCmd,
 	)
 }

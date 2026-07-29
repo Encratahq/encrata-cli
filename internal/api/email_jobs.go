@@ -35,12 +35,24 @@ func (c *Client) GetIdentityJob(ctx context.Context, id string) (json.RawMessage
 	return c.get(ctx, "/api/identity-jobs", q)
 }
 
+// ListIdentityJobs lists identity jobs (paginated).
+// GET /api/identity-jobs
+func (c *Client) ListIdentityJobs(ctx context.Context) (json.RawMessage, error) {
+	return c.get(ctx, "/api/identity-jobs", nil)
+}
+
 // GetPasswordJob fetches a password job by id.
 // GET /api/password-jobs?id=
 func (c *Client) GetPasswordJob(ctx context.Context, id string) (json.RawMessage, error) {
 	q := url.Values{}
 	q.Set("id", id)
 	return c.get(ctx, "/api/password-jobs", q)
+}
+
+// ListPasswordJobs lists password jobs (paginated).
+// GET /api/password-jobs
+func (c *Client) ListPasswordJobs(ctx context.Context) (json.RawMessage, error) {
+	return c.get(ctx, "/api/password-jobs", nil)
 }
 
 // GetIdentityJobResults fetches paginated identity job rows.

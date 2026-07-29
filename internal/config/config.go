@@ -69,7 +69,11 @@ func Save(cfg *Config) error {
 	viper.Set("output", cfg.Output)
 
 	configPath := filepath.Join(configDir, "config.yaml")
-	return viper.WriteConfigAs(configPath)
+	if err := viper.WriteConfigAs(configPath); err != nil {
+		return err
+	}
+	// The config stores the API key in plaintext, so restrict it to the owner.
+	return os.Chmod(configPath, 0o600)
 }
 
 func (c *Config) Validate() error {

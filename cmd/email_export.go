@@ -125,6 +125,39 @@ func rowIsValid(r map[string]interface{}) bool {
 	return normalizedValidityStatus(field(r, "validity", "status")) == "valid"
 }
 
+func rowIsInvalid(r map[string]interface{}) bool {
+	return normalizedValidityStatus(field(r, "validity", "status")) == "invalid"
+}
+
+// onlyFlag returns the trimmed --only value, or "" when the flag is absent.
+func onlyFlag(cmd *cobra.Command) string {
+	v, _ := cmd.Flags().GetString("only")
+	return strings.TrimSpace(v)
+}
+
+// resolveOnlyFilters merges the --only flag with the deprecated --valid-only /
+// --found-only booleans into concrete filter flags. Unknown --only values are
+// ignored here (validated at the command layer via validateOnly).
+func resolveOnlyFilters(cmd *cobra.Command) (validOnly, invalidOnly, foundOnly, breachedOnly bool) {
+	switch strings.ToLower(onlyFlag(cmd)) {
+	case "valid":
+		validOnly = true
+	case "invalid":
+		invalidOnly = true
+	case "found":
+		foundOnly = true
+	case "breached":
+		breachedOnly = true
+	}
+	if v, _ := cmd.Flags().GetBool("valid-only"); v {
+		validOnly = true
+	}
+	if f, _ := cmd.Flags().GetBool("found-only"); f {
+		foundOnly = true
+	}
+	return
+}
+
 func defaultValidityDownloadName(format string) string {
 	ext := strings.ToLower(strings.TrimSpace(format))
 	if ext == "" {
@@ -274,8 +307,7 @@ func exportBulk(cmd *cobra.Command, out string, results []map[string]interface{}
 	if len(columns) == 0 {
 		columns, _ = cmd.Flags().GetStringSlice("fields")
 	}
-	foundOnly, _ := cmd.Flags().GetBool("found-only")
-	validOnly, _ := cmd.Flags().GetBool("valid-only")
+	validOnly, invalidOnly, foundOnly, _ := resolveOnlyFilters(cmd)
 	formatFlag, _ := cmd.Flags().GetString("format")
 
 	format, err := resolveExportFormat(formatFlag, out)
@@ -297,6 +329,15 @@ func exportBulk(cmd *cobra.Command, out string, results []map[string]interface{}
 		filtered := make([]map[string]interface{}, 0, len(rows))
 		for _, r := range rows {
 			if rowIsValid(r) {
+				filtered = append(filtered, r)
+			}
+		}
+		rows = filtered
+	}
+	if invalidOnly {
+		filtered := make([]map[string]interface{}, 0, len(rows))
+		for _, r := range rows {
+			if rowIsInvalid(r) {
 				filtered = append(filtered, r)
 			}
 		}

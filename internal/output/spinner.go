@@ -5,6 +5,8 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"golang.org/x/term"
 )
 
 type Spinner struct {
@@ -23,6 +25,13 @@ func NewSpinner(message string) *Spinner {
 }
 
 func (s *Spinner) Start() {
+	// Off a TTY (piped/redirected/CI) or in --quiet mode, skip the animation
+	// entirely so we don't spray carriage returns and ANSI escapes into
+	// captured stderr/logs.
+	if quiet || !term.IsTerminal(int(os.Stderr.Fd())) {
+		close(s.done)
+		return
+	}
 	go func() {
 		defer close(s.done)
 

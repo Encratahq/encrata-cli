@@ -20,12 +20,15 @@ import (
 var Version = "dev"
 
 const (
-	requestTimeout = 90 * time.Second
 	streamTimeout  = 5 * time.Minute
 	maxRetries     = 3
 	initialBackoff = 500 * time.Millisecond
 	maxBackoff     = 10 * time.Second
 )
+
+// RequestTimeout is the per-request HTTP timeout. Defaults to 90s and can be
+// overridden (e.g. by the CLI's --timeout flag) before a client is created.
+var RequestTimeout = 90 * time.Second
 
 var retryableStatus = map[int]bool{
 	http.StatusTooManyRequests:     true,
@@ -48,7 +51,7 @@ func New(baseURL, apiKey string) *Client {
 		BaseURL:      strings.TrimRight(baseURL, "/"),
 		APIKey:       apiKey,
 		UserAgent:    "encrata-cli/" + Version,
-		HTTPClient:   &http.Client{Timeout: requestTimeout},
+		HTTPClient:   &http.Client{Timeout: RequestTimeout},
 		streamClient: &http.Client{Timeout: streamTimeout},
 	}
 }
@@ -234,6 +237,10 @@ func (c *Client) get(ctx context.Context, path string, query url.Values) (json.R
 
 func (c *Client) put(ctx context.Context, path string, payload interface{}) (json.RawMessage, error) {
 	return c.do(ctx, http.MethodPut, path, nil, payload)
+}
+
+func (c *Client) patchQuery(ctx context.Context, path string, query url.Values, payload interface{}) (json.RawMessage, error) {
+	return c.do(ctx, http.MethodPatch, path, query, payload)
 }
 
 func (c *Client) del(ctx context.Context, path string, query url.Values, payload interface{}) (json.RawMessage, error) {

@@ -15,7 +15,7 @@ import (
 var sha1Regex = regexp.MustCompile(`^[A-F0-9]{40}$`)
 
 var jobsBulkValidateCmd = &cobra.Command{
-	Use:   "bulk_validate_emails",
+	Use:   "bulk-validate-emails",
 	Short: "Create a validity async job from inline emails",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		emails, err := gatherJobEmails(cmd)
@@ -44,7 +44,7 @@ var jobsBulkValidateCmd = &cobra.Command{
 }
 
 var jobsBulkIdentityCmd = &cobra.Command{
-	Use:   "bulk_email_identity",
+	Use:   "bulk-email-identity",
 	Short: "Create an identity async job from inline emails",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		emails, err := gatherJobEmails(cmd)
@@ -72,7 +72,7 @@ var jobsBulkIdentityCmd = &cobra.Command{
 }
 
 var jobsBulkPasswordCmd = &cobra.Command{
-	Use:   "bulk_password_breaches",
+	Use:   "bulk-password-breaches",
 	Short: "Create a password breach async job from SHA-1 hashes",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sha1s, err := gatherSHA1s(cmd)
@@ -100,7 +100,7 @@ var jobsBulkPasswordCmd = &cobra.Command{
 }
 
 var jobsGetStatusCmd = &cobra.Command{
-	Use:   "get_email_job_status [job-id]",
+	Use:   "get-email-job-status [job-id]",
 	Short: "Get validity/identity/password job status",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -125,7 +125,7 @@ var jobsGetStatusCmd = &cobra.Command{
 }
 
 var jobsGetResultsCmd = &cobra.Command{
-	Use:   "get_email_job_results [job-id]",
+	Use:   "get-email-job-results [job-id]",
 	Short: "Get paginated results for validity/identity/password jobs",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -155,7 +155,7 @@ var jobsGetResultsCmd = &cobra.Command{
 }
 
 var jobsDownloadEmailCmd = &cobra.Command{
-	Use:   "download_email_job [job-id]",
+	Use:   "download-email-job [job-id]",
 	Short: "Download CSV or JSON for validity/identity/password jobs",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -197,7 +197,7 @@ var jobsDownloadEmailCmd = &cobra.Command{
 }
 
 var jobsCancelEmailCmd = &cobra.Command{
-	Use:   "cancel_email_job [job-id]",
+	Use:   "cancel-email-job [job-id]",
 	Short: "Cancel a validity/identity/password job",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -227,7 +227,7 @@ var jobsCancelEmailCmd = &cobra.Command{
 }
 
 var jobsRetryEmailCmd = &cobra.Command{
-	Use:   "retry_email_job [job-id]",
+	Use:   "retry-email-job [job-id]",
 	Short: "Retry dead-lettered chunks for a job",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -252,7 +252,7 @@ var jobsRetryEmailCmd = &cobra.Command{
 }
 
 var jobsListBulkCmd = &cobra.Command{
-	Use:   "list_bulk_jobs",
+	Use:   "list-bulk-jobs",
 	Short: "List all async bulk jobs",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client, err := newClient()
@@ -271,7 +271,7 @@ var jobsListBulkCmd = &cobra.Command{
 }
 
 var jobsGetBulkCmd = &cobra.Command{
-	Use:   "get_bulk_job [job-id]",
+	Use:   "get-bulk-job [job-id]",
 	Short: "Get a bulk job by ID",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -291,7 +291,7 @@ var jobsGetBulkCmd = &cobra.Command{
 }
 
 var jobsCancelBulkCmd = &cobra.Command{
-	Use:   "cancel_bulk_job [job-id]",
+	Use:   "cancel-bulk-job [job-id]",
 	Short: "Cancel a bulk job",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -512,7 +512,10 @@ func init() {
 	jobsDownloadEmailCmd.Flags().Bool("found-only", false, "Identity: found only")
 	jobsDownloadEmailCmd.Flags().String("out", "", "Write output to a file")
 
-	jobsCmd.AddCommand(
+	// These MCP-style commands are superseded by the unified `jobs <verb> --type`
+	// surface. They remain functional (for MCP parity and existing scripts) but
+	// are hidden from help.
+	deprecated := []*cobra.Command{
 		jobsBulkValidateCmd,
 		jobsBulkIdentityCmd,
 		jobsBulkPasswordCmd,
@@ -524,5 +527,9 @@ func init() {
 		jobsListBulkCmd,
 		jobsGetBulkCmd,
 		jobsCancelBulkCmd,
-	)
+	}
+	for _, c := range deprecated {
+		c.Hidden = true
+		jobsCmd.AddCommand(c)
+	}
 }

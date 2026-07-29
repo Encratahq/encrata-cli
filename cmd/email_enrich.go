@@ -7,8 +7,8 @@ import (
 
 var emailEnrichCmd = &cobra.Command{
 	Use:   "enrich [email]",
-	Short: "Validate an email and enrich it with person/company data",
-	Long:  "Return validity plus enrichment data (name, company, social profiles, domain trust) for an email address.",
+	Short: "Validity + company & domain enrichment (the validity --full data)",
+	Long:  "Return validity plus company, domain-trust and person signals for an email. For a person profile (work history, education, socials) use `email identity`.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Enrichment renders the same full detail sections as `validity --full`.

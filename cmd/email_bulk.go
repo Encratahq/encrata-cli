@@ -35,19 +35,49 @@ Examples:
 }
 
 func init() {
-	emailBulkCmd.Flags().Bool("stream", false, "Force live streaming (SSE) mode")
-	emailBulkCmd.Flags().Bool("job", false, "Force async job mode")
-	emailBulkCmd.Flags().Bool("enrich", false, "Run the full per-email report so every column is filled (1 credit per email)")
-	emailBulkCmd.Flags().Int("concurrency", 8, "Parallel lookups when --enrich is set")
-	emailBulkCmd.Flags().String("out", "", "Write results to a file (.csv, .xlsx, or .json)")
-	emailBulkCmd.Flags().String("format", "", "Export format: csv, xlsx, or json (default: inferred from --out)")
-	emailBulkCmd.Flags().StringSlice("columns", nil, "Columns to export (email, status, reason always included)")
-	emailBulkCmd.Flags().Bool("valid-only", false, "Export only rows whose status is valid")
-	emailBulkCmd.Flags().Bool("found-only", false, "Skip rows that carry no enrichment data")
-	emailBulkCmd.Flags().StringSlice("fields", nil, "Deprecated alias for --columns")
+	registerBulkFlags(emailBulkCmd, true)
+}
+
+// registerBulkFlags adds the shared bulk execution + export flags to a command.
+// includeOut adds --out for commands that don't already provide it.
+func registerBulkFlags(cmd *cobra.Command, includeOut bool) {
+	cmd.Flags().Bool("stream", false, "Force live streaming (SSE) mode")
+	cmd.Flags().Bool("job", false, "Force async job mode")
+	cmd.Flags().Bool("enrich", false, "Run the full per-email report so every column is filled (1 credit per email)")
+	cmd.Flags().Int("concurrency", 8, "Parallel lookups when --enrich is set")
+	cmd.Flags().String("format", "", "Export format: csv, xlsx, or json (default: inferred from --out)")
+	cmd.Flags().StringSlice("columns", nil, "Columns to export (email, status, reason always included)")
+	cmd.Flags().String("only", "", "Export only rows matching: valid | invalid | found")
+	if includeOut {
+		cmd.Flags().String("out", "", "Write results to a file (.csv, .xlsx, or .json)")
+	}
+	// Deprecated compatibility flags (hidden, superseded by --only / --columns).
+	cmd.Flags().Bool("valid-only", false, "Deprecated: use --only valid")
+	cmd.Flags().Bool("found-only", false, "Deprecated: use --only found")
+	cmd.Flags().StringSlice("fields", nil, "Deprecated alias for --columns")
+	_ = cmd.Flags().MarkHidden("valid-only")
+	_ = cmd.Flags().MarkHidden("found-only")
+	_ = cmd.Flags().MarkHidden("fields")
+}
+
+// validateOnly checks the --only value against the allowed set for a command.
+func validateOnly(cmd *cobra.Command, allowed ...string) error {
+	only := strings.ToLower(onlyFlag(cmd))
+	if only == "" {
+		return nil
+	}
+	for _, a := range allowed {
+		if a == only {
+			return nil
+		}
+	}
+	return friendlyFormatError(cmd, fmt.Sprintf("--only must be one of: %s", strings.Join(allowed, ", ")))
 }
 
 func runEmailBulk(cmd *cobra.Command, args []string) error {
+	if err := validateOnly(cmd, "valid", "invalid", "found"); err != nil {
+		return err
+	}
 	forceStream, _ := cmd.Flags().GetBool("stream")
 	forceJob, _ := cmd.Flags().GetBool("job")
 	enrich, _ := cmd.Flags().GetBool("enrich")
@@ -159,7 +189,6 @@ func runBulkEnrich(cmd *cobra.Command, client *api.Client, emails []string, out 
 
 	fmt.Println()
 	fmt.Println()
-	printResultsTable(results, fields)
 	printBulkSummaryLine(results)
 	if out != "" {
 		return exportBulk(cmd, out, results)
@@ -227,7 +256,6 @@ func runBulkStream(cmd *cobra.Command, client *api.Client, emails []string, file
 	}
 
 	fmt.Println()
-	printResultsTable(results, fields)
 	printBulkSummaryLine(results)
 	if out != "" {
 		return exportBulk(cmd, out, results)
