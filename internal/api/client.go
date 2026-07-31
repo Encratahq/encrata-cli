@@ -227,6 +227,47 @@ func (c *Client) post(ctx context.Context, path string, payload interface{}) (js
 	return c.do(ctx, http.MethodPost, path, nil, payload)
 }
 
+// postWithHeaders issues a POST with extra request headers (e.g. Idempotency-Key)
+// on top of the standard auth/content-type headers. No retry: callers that need
+// safe retries should supply an Idempotency-Key.
+func (c *Client) postWithHeaders(ctx context.Context, path string, payload interface{}, headers map[string]string) (json.RawMessage, error) {
+	var reader io.Reader
+	hasBody := payload != nil
+	if hasBody {
+		b, err := json.Marshal(payload)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode request: %w", err)
+		}
+		reader = bytes.NewReader(b)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+path, reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	c.setHeaders(req, hasBody)
+	for k, v := range headers {
+		if v != "" {
+			req.Header.Set(k, v)
+		}
+	}
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	data, readErr := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if readErr != nil {
+		return nil, fmt.Errorf("failed to read response: %w", readErr)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, parseError(resp.StatusCode, data)
+	}
+	return json.RawMessage(data), nil
+}
+
 func (c *Client) postQuery(ctx context.Context, path string, query url.Values, payload interface{}) (json.RawMessage, error) {
 	return c.do(ctx, http.MethodPost, path, query, payload)
 }

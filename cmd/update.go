@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/Encratahq/cli/internal/output"
+	"github.com/Encratahq/cli/internal/version"
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +41,7 @@ var updateCmd = &cobra.Command{
 
 func runUpdate() error {
 	output.Header("Update Encrata CLI")
-	fmt.Printf("  Current version: v%s\n", version)
+	fmt.Printf("  Current version: v%s\n", version.Version)
 
 	latest, err := latestRelease()
 	if err != nil {
@@ -49,7 +50,7 @@ func runUpdate() error {
 	}
 	fmt.Printf("  Latest version:  v%s\n\n", latest)
 
-	if version != "dev" && normalizeVersion(latest) == normalizeVersion(version) {
+	if version.Version != "dev" && normalizeVersion(latest) == normalizeVersion(version.Version) {
 		output.SuccessMsg("You're already on the latest version.")
 		return nil
 	}
