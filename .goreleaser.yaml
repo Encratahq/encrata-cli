@@ -14,10 +14,10 @@ builds:
     binary: encrata
     env:
       - CGO_ENABLED=0
-    # Inject the version (from the git tag) into cmd.version at build time,
-    # and strip debug info (-s -w) to shrink the binary.
+    # Inject version/commit/date (from the git tag) into internal/version at
+    # build time, and strip debug info (-s -w) to shrink the binary.
     ldflags:
-      - -s -w -X github.com/Encratahq/cli/cmd.version={{ .Version }}
+      - -s -w -X github.com/Encratahq/cli/internal/version.Version={{ .Version }} -X github.com/Encratahq/cli/internal/version.Commit={{ .ShortCommit }} -X github.com/Encratahq/cli/internal/version.Date={{ .Date }}
     goos:
       - darwin
       - linux

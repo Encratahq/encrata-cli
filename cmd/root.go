@@ -13,6 +13,7 @@ import (
 	"github.com/Encratahq/cli/internal/api"
 	"github.com/Encratahq/cli/internal/config"
 	"github.com/Encratahq/cli/internal/output"
+	"github.com/Encratahq/cli/internal/version"
 	"github.com/spf13/cobra"
 )
 
@@ -90,6 +91,8 @@ func Execute() int {
 
 func init() {
 	cobra.OnInitialize(initConfig)
+	rootCmd.Version = version.Version
+	rootCmd.SetVersionTemplate("encrata v" + version.Version + " (commit " + version.Commit + ", built " + version.Date + ")\n")
 	rootCmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
 	rootCmd.PersistentFlags().String("api-key", "", "API key (overrides config/env)")
 	rootCmd.PersistentFlags().String("base-url", "", "API base URL (overrides config/env)")
@@ -112,13 +115,14 @@ func init() {
 	rootCmd.AddCommand(listsCmd)
 	rootCmd.AddCommand(webhooksCmd)
 	rootCmd.AddCommand(workspaceCmd)
+	rootCmd.AddCommand(workflowsCmd)
 	improveArgErrors(rootCmd)
 }
 
 func initConfig() {
 	cfg = config.Load()
 
-	api.Version = version
+	api.Version = version.Version
 
 	if key, _ := rootCmd.PersistentFlags().GetString("api-key"); key != "" {
 		cfg.APIKey = key
