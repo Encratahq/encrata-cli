@@ -22,3 +22,10 @@ npm/encrata/bin/.extract/
 # OS
 .DS_Store
 Thumbs.db
+
+# Local scratch / test outputs
+.e2e-*/
+/email-breaches.csv
+/email-identity.csv
+/emails.csv
+tests/e2e/*.csv

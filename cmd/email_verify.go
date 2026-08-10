@@ -12,7 +12,7 @@ var emailVerifyCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return emailLookup(cmd, args[0], "Verify", "Verifying email...",
-			(*api.Client).EmailVerify,
+			api.API.EmailVerify,
 			func(r map[string]interface{}) {
 				verdict := field(r, "status", "result", "verdict", "validity")
 				printNonEmptyKV(

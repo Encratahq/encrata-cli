@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-08-10
+
+### Added
+- Bulk email jobs — submit, poll, summarise and download large enrichment runs
+  for validity, identity and breach modes.
+
+### Changed
+- Internal reorganisation: large command and API files split into focused units
+  (jobs, keys, lists, webhooks, workflows, workspace, render/export helpers) for
+  maintainability. No user-facing command surface removed.
+
 ## [0.8.0] - 2026-07-31
 
 ### Added
@@ -48,5 +59,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The connected-account spreadsheet route is `/api/workflows/integrations/{id}/sheet`
   (not `/create-sheet`) and returns `{spreadsheet_id, spreadsheet_url, sheet_name}`.
 
-[Unreleased]: https://github.com/Encratahq/encrata-cli/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/Encratahq/encrata-cli/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.9.0
 [0.8.0]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.8.0

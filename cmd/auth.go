@@ -40,7 +40,7 @@ Examples:
 			return friendlyFormatError(cmd, "API key cannot be empty")
 		}
 
-		client := api.New(cfg.BaseURL, key)
+		client := api.New(app.cfg.BaseURL, key)
 		spinner := startSpinner("Verifying key...")
 		data, err := client.Me(cmd.Context())
 		stopSpinner(spinner)
@@ -49,8 +49,8 @@ Examples:
 			return err
 		}
 
-		cfg.APIKey = key
-		if err := config.Save(cfg); err != nil {
+		app.cfg.APIKey = key
+		if err := config.Save(app.cfg); err != nil {
 			return fmt.Errorf("failed to save config: %w", err)
 		}
 
@@ -68,8 +68,8 @@ var logoutCmd = &cobra.Command{
 	Use:   "logout",
 	Short: "Clear the saved API key",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg.APIKey = ""
-		if err := config.Save(cfg); err != nil {
+		app.cfg.APIKey = ""
+		if err := config.Save(app.cfg); err != nil {
 			return fmt.Errorf("failed to save config: %w", err)
 		}
 		output.SuccessMsg("Logged out — saved API key cleared")

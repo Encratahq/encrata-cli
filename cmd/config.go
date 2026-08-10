@@ -38,8 +38,8 @@ var setKeyCmd = &cobra.Command{
 			return fmt.Errorf("API key cannot be empty")
 		}
 
-		cfg.APIKey = key
-		if err := config.Save(cfg); err != nil {
+		app.cfg.APIKey = key
+		if err := config.Save(app.cfg); err != nil {
 			return fmt.Errorf("failed to save config: %w", err)
 		}
 
@@ -53,8 +53,8 @@ var setURLCmd = &cobra.Command{
 	Short: "Set custom API base URL",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg.BaseURL = args[0]
-		if err := config.Save(cfg); err != nil {
+		app.cfg.BaseURL = args[0]
+		if err := config.Save(app.cfg); err != nil {
 			return fmt.Errorf("failed to save config: %w", err)
 		}
 		output.Success.Printf("  ✓ Base URL set to %s\n", args[0])
@@ -73,15 +73,15 @@ output (reverts to table).`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		switch strings.ToLower(strings.TrimSpace(args[0])) {
 		case "api-key", "key":
-			cfg.APIKey = ""
+			app.cfg.APIKey = ""
 		case "base-url", "url":
-			cfg.BaseURL = config.DefaultBaseURL
+			app.cfg.BaseURL = config.DefaultBaseURL
 		case "output":
-			cfg.Output = "table"
+			app.cfg.Output = "table"
 		default:
 			return fmt.Errorf("unknown key %q; use one of: api-key, base-url, output", args[0])
 		}
-		if err := config.Save(cfg); err != nil {
+		if err := config.Save(app.cfg); err != nil {
 			return fmt.Errorf("failed to save config: %w", err)
 		}
 		output.Success.Printf("  ✓ Cleared %s\n", args[0])
@@ -95,17 +95,17 @@ var showConfigCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		output.Header("Configuration")
 		maskedKey := "not set"
-		if cfg.APIKey != "" {
-			if len(cfg.APIKey) > 8 {
-				maskedKey = cfg.APIKey[:4] + "..." + cfg.APIKey[len(cfg.APIKey)-4:]
+		if app.cfg.APIKey != "" {
+			if len(app.cfg.APIKey) > 8 {
+				maskedKey = app.cfg.APIKey[:4] + "..." + app.cfg.APIKey[len(app.cfg.APIKey)-4:]
 			} else {
 				maskedKey = "****"
 			}
 		}
 		output.KV(
 			"API Key", maskedKey,
-			"Base URL", cfg.BaseURL,
-			"Output", cfg.Output,
+			"Base URL", app.cfg.BaseURL,
+			"Output", app.cfg.Output,
 		)
 		fmt.Println()
 	},

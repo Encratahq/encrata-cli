@@ -13,7 +13,7 @@ var emailEnrichCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Enrichment renders the same full detail sections as `validity --full`.
 		return emailLookup(cmd, args[0], "Enrichment", "Enriching email...",
-			(*api.Client).EmailEnrich,
+			api.API.EmailEnrich,
 			renderValidity(true),
 			freeFooter)
 	},

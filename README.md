@@ -300,7 +300,7 @@ encrata email identity emails.csv --bulk --only found --out people.xlsx
 Bulk options: `--bulk`, `--concurrency` (default 8), `--out` (`.csv`/`.xlsx`/`.json`),
 `--format`, `--only found`. Bulk exports flatten to `email`, `found`, `name`,
 `company`, `job_role`, `location`; `--format json` writes the raw objects. For
-very large lists, prefer the async `identity-jobs` surface.
+very large lists, prefer the async `jobs --type identity` surface.
 
 ---
 
@@ -525,9 +525,9 @@ Options:
 | `download` | `--out` | Write to a file instead of stdout |
 | `retry` | | Re-drive dead-lettered chunks (validity/identity; password has no retry) |
 
-> **Deprecated:** the separate `identity-jobs` / `password-jobs` groups and the
-> MCP-style names (`bulk-validate-emails`, `get-email-job-status`, …) still work
-> but are hidden — use `jobs <verb> --type` instead.
+> **Note:** `jobs <verb> --type` is the single async-job surface. The former
+> standalone `identity-jobs` / `password-jobs` groups and the MCP-style names
+> (`bulk-validate-emails`, `get-email-job-status`, …) have been removed.
 
 ---
 

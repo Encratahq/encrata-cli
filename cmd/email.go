@@ -57,7 +57,7 @@ func init() {
 func emailLookup(
 	cmd *cobra.Command,
 	email, title, spinnerMsg string,
-	call func(*api.Client, context.Context, string) (json.RawMessage, error),
+	call func(api.API, context.Context, string) (json.RawMessage, error),
 	render func(map[string]interface{}),
 	footer func(map[string]interface{}),
 ) error {

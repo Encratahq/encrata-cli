@@ -28,7 +28,6 @@ const (
 )
 
 var (
-	cfg        *config.Config
 	jsonOutput bool
 )
 
@@ -110,8 +109,6 @@ func init() {
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(updateCmd)
 	rootCmd.AddCommand(jobsCmd)
-	rootCmd.AddCommand(identityJobsCmd)
-	rootCmd.AddCommand(passwordJobsCmd)
 	rootCmd.AddCommand(listsCmd)
 	rootCmd.AddCommand(webhooksCmd)
 	rootCmd.AddCommand(workspaceCmd)
@@ -120,18 +117,18 @@ func init() {
 }
 
 func initConfig() {
-	cfg = config.Load()
+	app.cfg = config.Load()
 
 	api.Version = version.Version
 
 	if key, _ := rootCmd.PersistentFlags().GetString("api-key"); key != "" {
-		cfg.APIKey = key
+		app.cfg.APIKey = key
 	}
 	if url, _ := rootCmd.PersistentFlags().GetString("base-url"); url != "" {
-		cfg.BaseURL = url
+		app.cfg.BaseURL = url
 	}
 	if jsonOutput {
-		cfg.Output = "json"
+		app.cfg.Output = "json"
 	}
 	if quiet, _ := rootCmd.PersistentFlags().GetBool("quiet"); quiet {
 		output.SetQuiet(true)
