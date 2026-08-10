@@ -12,7 +12,7 @@ import (
 
 func TestBulkValiditySearchStreamsResults(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/bulk-validity-search" {
+		if r.URL.Path != "/api/agent/bulk-validity-search" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -64,7 +64,7 @@ func TestBulkValiditySearchStreamsResults(t *testing.T) {
 
 func TestEmailValidityPostsEmail(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/email/validity" {
+		if r.URL.Path != "/api/agent/email-validity" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		var body struct {

@@ -49,7 +49,7 @@ func TestUploadWorkflowFile_MultipartFieldAndResponse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("upload: %v", err)
 	}
-	if gotPath != "/api/workflows/files" || gotMethod != http.MethodPost {
+	if gotPath != "/api/agent/workflows/files" || gotMethod != http.MethodPost {
 		t.Fatalf("path/method = %s %s", gotMethod, gotPath)
 	}
 	if gotFileField != "emails.csv" || !strings.Contains(gotFileContent, "a@x.com") {
@@ -85,7 +85,7 @@ func TestRunWorkflow_BodyFileIDAndIdempotencyHeader(t *testing.T) {
 	if _, err := c.RunWorkflow(context.Background(), "wf_9", "file_1", "idem-123"); err != nil {
 		t.Fatalf("run: %v", err)
 	}
-	if gotPath != "/api/workflows/wf_9/run" {
+	if gotPath != "/api/agent/workflows/wf_9/run" {
 		t.Fatalf("path = %q", gotPath)
 	}
 	if body["file_id"] != "file_1" {
@@ -109,7 +109,7 @@ func TestGetWorkflowRun_PathAndWrapper(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get run: %v", err)
 	}
-	if gotPath != "/api/workflows/runs/run_1" {
+	if gotPath != "/api/agent/workflows/runs/run_1" {
 		t.Fatalf("path = %q", gotPath)
 	}
 	var wrap struct {
@@ -143,7 +143,7 @@ func TestDownloadWorkflowRunOutput_Follows302(t *testing.T) {
 	if err != nil {
 		t.Fatalf("download: %v", err)
 	}
-	if gotPath != "/api/workflows/runs/run_1/download" {
+	if gotPath != "/api/agent/workflows/runs/run_1/download" {
 		t.Fatalf("path = %q", gotPath)
 	}
 	if !strings.Contains(string(data), "email,validity") {
@@ -164,7 +164,7 @@ func TestCreateIntegrationSheet_UsesSheetSuffix(t *testing.T) {
 		t.Fatalf("create sheet: %v", err)
 	}
 	// Backend route is /sheet, NOT /create-sheet.
-	if gotPath != "/api/workflows/integrations/int_1/sheet" {
+	if gotPath != "/api/agent/workflows/integrations/int_1/sheet" {
 		t.Fatalf("path = %q (must end in /sheet)", gotPath)
 	}
 }

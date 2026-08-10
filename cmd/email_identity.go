@@ -3,10 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/Encratahq/cli/internal/api"
@@ -42,7 +38,7 @@ Examples:
 		}
 		full, _ := cmd.Flags().GetBool("full")
 		return emailLookup(cmd, args[0], "Identity", "Resolving identity...",
-			(*api.Client).EmailIdentity,
+			api.API.EmailIdentity,
 			renderIdentity(full),
 			nil)
 	},
@@ -56,168 +52,6 @@ func init() {
 	emailIdentityCmd.Flags().String("only", "", "Export only rows matching: found")
 	emailIdentityCmd.Flags().Bool("found-only", false, "Deprecated: use --only found")
 	_ = emailIdentityCmd.Flags().MarkHidden("found-only")
-}
-
-func renderIdentity(full bool) func(map[string]interface{}) {
-	return func(r map[string]interface{}) {
-		// The identity response nests the profile under "person"; fall back to the
-		// top level for older/flat shapes.
-		person := getMap(r, "person")
-		if person == nil {
-			person = r
-		}
-
-		printNonEmptyKV(
-			"Name", personName(person),
-			"Job title", field(person, "job_role", "job_title", "pdl.job_title", "title"),
-			"Company", field(person, "company", "pdl.job_company_name", "company_profile.name", "company_info.name"),
-			"Industry", field(person, "industry", "pdl.job_company_industry"),
-			"Location", personLocation(person),
-			"Website", field(person, "website"),
-			"Bio", field(person, "bio"),
-		)
-		fmt.Println()
-
-		renderSocials(person)
-		renderWorkHistory(person)
-		renderEducation(person)
-
-		registered := countField(person, "registered_services.registered_count", "registered_services.services")
-		printNonEmptyKV(
-			"Registered services", registered,
-			"Breaches", countField(person, "breach_info.breach_count", "breach_info.count", "breaches", "breach_count"),
-		)
-		if full {
-			renderBreachTable(person)
-		}
-	}
-}
-
-// personName composes a display name from a person object, joining the split
-// name parts when a single name field is absent.
-func personName(person map[string]interface{}) string {
-	if name := field(person, "name", "full_name"); name != "" {
-		return name
-	}
-	parts := make([]string, 0, 3)
-	for _, key := range []string{"first_name", "middle_name", "last_name"} {
-		if v := field(person, key); v != "" {
-			parts = append(parts, v)
-		}
-	}
-	return strings.TrimSpace(strings.Join(parts, " "))
-}
-
-// personLocation builds a readable location from current_location, or city and
-// country when that field is absent.
-func personLocation(person map[string]interface{}) string {
-	if loc := field(person, "current_location", "location"); loc != "" {
-		return loc
-	}
-	parts := make([]string, 0, 2)
-	for _, key := range []string{"city", "country"} {
-		if v := field(person, key); v != "" {
-			parts = append(parts, v)
-		}
-	}
-	return strings.Join(parts, ", ")
-}
-
-func renderSocials(sources ...map[string]interface{}) {
-	printed := false
-	for _, r := range sources {
-		if socials := getMap(r, "socials"); len(socials) > 0 {
-			if !printed {
-				output.Bold.Println("  Socials:")
-				printed = true
-			}
-			for platform, url := range socials {
-				if v := fmt.Sprintf("%v", url); v != "" && v != "<nil>" {
-					fmt.Printf("    %s: %s\n", platform, v)
-				}
-			}
-		}
-		for _, s := range firstArr(r, "social_profiles", "socials") {
-			m := asMap(s)
-			platform := field(m, "platform", "network", "type")
-			url := field(m, "url", "link")
-			if platform == "" && url == "" {
-				continue
-			}
-			if !printed {
-				output.Bold.Println("  Socials:")
-				printed = true
-			}
-			fmt.Printf("    %s: %s\n", firstNonEmpty(platform, "—"), firstNonEmpty(url, "—"))
-		}
-	}
-	if printed {
-		fmt.Println()
-	}
-}
-
-func renderWorkHistory(sources ...map[string]interface{}) {
-	var arr []interface{}
-	for _, r := range sources {
-		if arr = firstArr(r, "pdl.experience", "work_history", "experience", "employment", "jobs"); len(arr) > 0 {
-			break
-		}
-	}
-	if len(arr) == 0 {
-		return
-	}
-	output.Bold.Println("  Work history:")
-	rows := make([][]string, 0, len(arr))
-	for _, it := range arr {
-		m := asMap(it)
-		rows = append(rows, []string{
-			firstNonEmpty(field(m, "title", "role", "position"), "—"),
-			firstNonEmpty(field(m, "company_name", "company", "name", "organization"), "—"),
-			firstNonEmpty(period(m), "—"),
-		})
-	}
-	output.Table([]string{"Title", "Company", "Period"}, rows)
-	fmt.Println()
-}
-
-func renderEducation(sources ...map[string]interface{}) {
-	var arr []interface{}
-	for _, r := range sources {
-		if arr = firstArr(r, "pdl.education", "education", "schools"); len(arr) > 0 {
-			break
-		}
-	}
-	if len(arr) == 0 {
-		return
-	}
-	output.Bold.Println("  Education:")
-	rows := make([][]string, 0, len(arr))
-	for _, it := range arr {
-		m := asMap(it)
-		degree := firstNonEmpty(strings2(
-			firstNonEmpty(field(m, "degree"), listField(m, "degrees")),
-			firstNonEmpty(field(m, "field", "field_of_study"), listField(m, "majors")),
-		), "—")
-		rows = append(rows, []string{
-			firstNonEmpty(field(m, "school_name", "school", "name", "institution"), "—"),
-			degree,
-			firstNonEmpty(period(m), "—"),
-		})
-	}
-	output.Table([]string{"School", "Degree / field", "Period"}, rows)
-	fmt.Println()
-}
-
-// strings2 joins a degree and field with " / " when both are present.
-func strings2(a, b string) string {
-	switch {
-	case a != "" && b != "":
-		return a + " / " + b
-	case a != "":
-		return a
-	default:
-		return b
-	}
 }
 
 // runIdentityBulk resolves identities for a file/STDIN list concurrently,
@@ -308,108 +142,12 @@ func runIdentityBulk(cmd *cobra.Command, path string) error {
 
 	fmt.Println()
 	fmt.Println()
-	fmt.Printf("  Checked %d · Found %s · Not found %s\n",
+	fmt.Printf("  Checked %d · Found %s · Not found %s · Credits %d\n",
 		total,
 		output.Success.Sprintf("%d", found),
 		output.Dim.Sprintf("%d", total-found),
+		sumCredits(results),
 	)
-	if out != "" {
-		return exportIdentity(cmd, out, results)
-	}
-	return nil
-}
-
-// identityPerson returns the nested person object, or the row itself.
-func identityPerson(r map[string]interface{}) map[string]interface{} {
-	if p := getMap(r, "person"); p != nil {
-		return p
-	}
-	return r
-}
-
-// identityFound reports whether a row resolved to a real person.
-func identityFound(r map[string]interface{}) bool {
-	if boolField(r, "found") == "true" {
-		return true
-	}
-	p := identityPerson(r)
-	if personName(p) != "" {
-		return true
-	}
-	if field(p, "company", "pdl.job_company_name", "company_profile.name", "company_info.name") != "" {
-		return true
-	}
-	return len(firstArr(p, "social_profiles", "socials")) > 0
-}
-
-// countFoundIdentities tallies rows that resolved to a person.
-func countFoundIdentities(rows []map[string]interface{}) int {
-	n := 0
-	for _, r := range rows {
-		if identityFound(r) {
-			n++
-		}
-	}
-	return n
-}
-
-// identityExportColumns is the flat schema for bulk-identity CSV/XLSX exports.
-var identityExportColumns = []exportColumn{
-	{"email", func(r map[string]interface{}) string { return field(r, "email", "query") }},
-	{"found", func(r map[string]interface{}) string { return yesNo(strconv.FormatBool(identityFound(r))) }},
-	{"name", func(r map[string]interface{}) string { return personName(identityPerson(r)) }},
-	{"company", func(r map[string]interface{}) string {
-		return field(identityPerson(r), "company", "pdl.job_company_name", "company_profile.name", "company_info.name")
-	}},
-	{"job_role", func(r map[string]interface{}) string {
-		return field(identityPerson(r), "job_role", "job_title", "pdl.job_title", "title")
-	}},
-	{"location", func(r map[string]interface{}) string { return personLocation(identityPerson(r)) }},
-}
-
-// exportIdentity writes bulk-identity results to a file, honoring --format or
-// the --out extension. JSON emits the raw, nested objects.
-func exportIdentity(cmd *cobra.Command, out string, results []map[string]interface{}) error {
-	_, _, foundOnly, _ := resolveOnlyFilters(cmd)
-	rows := results
-	if foundOnly {
-		filtered := make([]map[string]interface{}, 0, len(results))
-		for _, r := range results {
-			if identityFound(r) {
-				filtered = append(filtered, r)
-			}
-		}
-		rows = filtered
-	}
-
-	formatFlag, _ := cmd.Flags().GetString("format")
-	format, err := resolveExportFormat(formatFlag, out)
-	if err != nil {
-		return friendlyFormatError(cmd, err.Error())
-	}
-	if strings.TrimSpace(out) == "" && (format == "csv" || format == "xlsx") {
-		out = fmt.Sprintf("email-identity.%s", format)
-	}
-
-	switch format {
-	case "json":
-		err = writeRawJSON(out, rows)
-	case "xlsx":
-		err = writeXLSX(out, identityExportColumns, rows)
-	default:
-		err = writeFlatCSV(out, identityExportColumns, rows)
-	}
-	if err != nil {
-		return err
-	}
-	if info, statErr := os.Stat(out); statErr != nil || info.Size() == 0 {
-		return fmt.Errorf("failed to write results to %s", out)
-	}
-	abs, absErr := filepath.Abs(out)
-	if absErr != nil {
-		abs = out
-	}
-	fmt.Fprintf(os.Stderr, "  Wrote %d %s\n", len(rows), plural(len(rows), "row", "rows"))
-	output.SavedPath(abs)
-	return nil
+	// Bulk always persists rows; exportIdentity auto-names the file when --out is empty.
+	return exportIdentity(cmd, out, results)
 }

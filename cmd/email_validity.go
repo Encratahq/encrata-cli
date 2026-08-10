@@ -26,7 +26,7 @@ Examples:
 		}
 		full, _ := cmd.Flags().GetBool("full")
 		return emailLookup(cmd, args[0], "Validity", "Checking validity...",
-			(*api.Client).EmailValidity,
+			api.API.EmailValidity,
 			renderValidity(full),
 			nil)
 	},

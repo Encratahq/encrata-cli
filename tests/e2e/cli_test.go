@@ -74,7 +74,7 @@ func TestEmailValidityRejectsInvalidAddress(t *testing.T) {
 
 func TestEmailBulkFromFileUsesSSEServer(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/bulk-validity-search" {
+		if r.URL.Path != "/api/agent/bulk-validity-search" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -172,7 +172,7 @@ func exitCode(t *testing.T, err error) int {
 
 func TestPasswordSingleBreachedExitCodes(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/password/breaches" {
+		if r.URL.Path != "/api/agent/password-breaches" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		var body map[string]interface{}
@@ -265,7 +265,7 @@ func TestPasswordJSONModePassesThrough(t *testing.T) {
 func TestPasswordBulkFromFileDedupes(t *testing.T) {
 	var gotHashes []interface{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/password/breaches/bulk" {
+		if r.URL.Path != "/api/agent/password-breaches/bulk" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		var body map[string]interface{}
@@ -324,7 +324,7 @@ const bareResult = `{"email":"bare@example.com","validity":"invalid","reason":"h
 func bulkSSEServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/bulk-validity-search" {
+		if r.URL.Path != "/api/agent/bulk-validity-search" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -559,7 +559,7 @@ func TestBulkExportXLSX(t *testing.T) {
 
 func TestJobsDownloadXLSXValidOnly(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/validity-jobs/download" {
+		if r.URL.Path != "/api/agent/validity-jobs/download" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		if got := r.URL.Query().Get("status"); got != "valid" {
@@ -610,7 +610,7 @@ func TestJobsDownloadXLSXValidOnly(t *testing.T) {
 
 func TestJobsDownloadCSVValidOnlyCanonicalColumns(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/validity-jobs/download" {
+		if r.URL.Path != "/api/agent/validity-jobs/download" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		if got := r.URL.Query().Get("status"); got != "valid" {
@@ -728,7 +728,7 @@ func TestListsAddEmails(t *testing.T) {
 
 func TestJobsBulkIdentityJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/identity-jobs" {
+		if r.URL.Path != "/api/agent/identity-jobs" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		if r.Method != http.MethodPost {
@@ -747,10 +747,15 @@ func TestJobsBulkIdentityJSON(t *testing.T) {
 	}))
 	defer server.Close()
 
+	emailFile := filepath.Join(t.TempDir(), "emails.txt")
+	if err := os.WriteFile(emailFile, []byte("one@example.com\ntwo@example.com\n"), 0o644); err != nil {
+		t.Fatalf("failed to write emails file: %v", err)
+	}
+
 	env := map[string]string{"ENCRATA_API_KEY": "test-key", "ENCRATA_BASE_URL": server.URL}
-	out, err := runCLI(t, env, "jobs", "bulk-email-identity", "--emails", "one@example.com", "--emails", "two@example.com", "--json")
+	out, err := runCLI(t, env, "jobs", "create", emailFile, "--type", "identity", "--json")
 	if err != nil {
-		t.Fatalf("bulk_email_identity failed: %v\n%s", err, out)
+		t.Fatalf("jobs create --type identity failed: %v\n%s", err, out)
 	}
 	for _, want := range []string{`"id": "job_i1"`, `"status": "queued"`} {
 		if !strings.Contains(out, want) {
@@ -761,7 +766,7 @@ func TestJobsBulkIdentityJSON(t *testing.T) {
 
 func TestJobsGetEmailJobResultsPasswordBreached(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/password-jobs/results" {
+		if r.URL.Path != "/api/agent/password-jobs/results" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		q := r.URL.Query()
@@ -774,9 +779,9 @@ func TestJobsGetEmailJobResultsPasswordBreached(t *testing.T) {
 	defer server.Close()
 
 	env := map[string]string{"ENCRATA_API_KEY": "test-key", "ENCRATA_BASE_URL": server.URL}
-	out, err := runCLI(t, env, "jobs", "get-email-job-results", "job_p1", "--job-type", "password", "--page", "2", "--page-size", "100", "--breached", "--json")
+	out, err := runCLI(t, env, "jobs", "results", "job_p1", "--type", "password", "--page", "2", "--page-size", "100", "--breached", "--json")
 	if err != nil {
-		t.Fatalf("get_email_job_results failed: %v\n%s", err, out)
+		t.Fatalf("jobs results --type password failed: %v\n%s", err, out)
 	}
 	if !strings.Contains(out, `"sha1": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"`) {
 		t.Fatalf("expected password results json, got:\n%s", out)
@@ -785,7 +790,7 @@ func TestJobsGetEmailJobResultsPasswordBreached(t *testing.T) {
 
 func TestJobsRetryIdentityJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/identity-jobs/retry" {
+		if r.URL.Path != "/api/agent/identity-jobs/retry" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		if r.URL.Query().Get("id") != "job_i1" {
@@ -800,9 +805,9 @@ func TestJobsRetryIdentityJSON(t *testing.T) {
 	defer server.Close()
 
 	env := map[string]string{"ENCRATA_API_KEY": "test-key", "ENCRATA_BASE_URL": server.URL}
-	out, err := runCLI(t, env, "jobs", "retry-email-job", "job_i1", "--job-type", "identity", "--json")
+	out, err := runCLI(t, env, "jobs", "retry", "job_i1", "--type", "identity", "--json")
 	if err != nil {
-		t.Fatalf("retry_email_job failed: %v\n%s", err, out)
+		t.Fatalf("jobs retry --type identity failed: %v\n%s", err, out)
 	}
 	if !strings.Contains(out, `"requeued": 3`) {
 		t.Fatalf("expected retry response, got:\n%s", out)
@@ -815,7 +820,7 @@ const identityPayload = `{"email":"venkat@unosend.co","validity":"valid","person
 
 func TestEmailIdentityJSONStdoutPure(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/email/identity" {
+		if r.URL.Path != "/api/agent/email-identity" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -851,7 +856,7 @@ func TestEmailIdentityJSONStdoutPure(t *testing.T) {
 
 func TestEmailValidityOutWritesFileAndPrintsPath(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/email/validity" {
+		if r.URL.Path != "/api/agent/email-validity" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -915,7 +920,7 @@ func TestEmailValidityJSONOutKeepsStdoutPure(t *testing.T) {
 
 func TestEmailBreachesRendersBreachInfo(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/email/breaches" {
+		if r.URL.Path != "/api/agent/breaches" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -941,7 +946,7 @@ func TestEmailBreachesRendersBreachInfo(t *testing.T) {
 
 func TestEmailIdentityRendersPersonBlock(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/email/identity" {
+		if r.URL.Path != "/api/agent/email-identity" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -963,7 +968,7 @@ func TestEmailIdentityRendersPersonBlock(t *testing.T) {
 
 func TestEmailVerifyRendersStatus(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/email/verify" {
+		if r.URL.Path != "/api/agent/email-verify" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -985,7 +990,7 @@ func TestEmailVerifyRendersStatus(t *testing.T) {
 
 func TestEmailBulkEnrichFillsColumns(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/email/validity" {
+		if r.URL.Path != "/api/agent/email-validity" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		var body map[string]interface{}
