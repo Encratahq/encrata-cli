@@ -13,15 +13,15 @@ type BulkEvent struct {
 }
 
 // BulkValiditySearch streams validity results for many emails over SSE.
-// POST /api/agent/bulk-validity-search
+// POST /api/cli/bulk-validity-search
 func (c *Client) BulkValiditySearch(ctx context.Context, queries []string, fileName string, onEvent func(BulkEvent) error) error {
-	return c.bulkSearch(ctx, "/api/agent/bulk-validity-search", queries, fileName, onEvent)
+	return c.bulkSearch(ctx, "/api/cli/bulk-validity-search", queries, fileName, onEvent)
 }
 
 // BulkBreachesSearch streams breach results for many emails over SSE.
-// POST /api/agent/bulk-breaches-search
+// POST /api/cli/bulk-breaches-search
 func (c *Client) BulkBreachesSearch(ctx context.Context, queries []string, fileName string, onEvent func(BulkEvent) error) error {
-	return c.bulkSearch(ctx, "/api/agent/bulk-breaches-search", queries, fileName, onEvent)
+	return c.bulkSearch(ctx, "/api/cli/bulk-breaches-search", queries, fileName, onEvent)
 }
 
 func (c *Client) bulkSearch(ctx context.Context, path string, queries []string, fileName string, onEvent func(BulkEvent) error) error {

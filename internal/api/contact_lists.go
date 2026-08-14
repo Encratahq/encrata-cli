@@ -20,47 +20,47 @@ type ContactListEmail struct {
 }
 
 // ListContactLists lists all contact lists.
-// GET /api/agent/lists
+// GET /api/cli/lists
 func (c *Client) ListContactLists(ctx context.Context) (json.RawMessage, error) {
-	return c.get(ctx, "/api/agent/lists", nil)
+	return c.get(ctx, "/api/cli/lists", nil)
 }
 
 // CreateContactList creates a new contact list and optionally seeds emails.
-// POST /api/agent/lists
+// POST /api/cli/lists
 func (c *Client) CreateContactList(ctx context.Context, name string, emails []string) (json.RawMessage, error) {
 	payload := map[string]interface{}{"name": name}
 	if len(emails) > 0 {
 		payload["emails"] = emails
 	}
-	return c.post(ctx, "/api/agent/lists", payload)
+	return c.post(ctx, "/api/cli/lists", payload)
 }
 
 // GetContactList fetches one contact list by id.
-// GET /api/agent/lists/:id
+// GET /api/cli/lists/:id
 func (c *Client) GetContactList(ctx context.Context, id string) (json.RawMessage, error) {
-	return c.get(ctx, "/api/agent/lists/"+url.PathEscape(id), nil)
+	return c.get(ctx, "/api/cli/lists/"+url.PathEscape(id), nil)
 }
 
 // DeleteContactList permanently deletes one contact list by id.
-// DELETE /api/agent/lists/:id
+// DELETE /api/cli/lists/:id
 func (c *Client) DeleteContactList(ctx context.Context, id string) (json.RawMessage, error) {
-	return c.del(ctx, "/api/agent/lists/"+url.PathEscape(id), nil, nil)
+	return c.del(ctx, "/api/cli/lists/"+url.PathEscape(id), nil, nil)
 }
 
 // ListContactListEmails returns all emails in a list.
-// GET /api/agent/lists/:id/emails
+// GET /api/cli/lists/:id/emails
 func (c *Client) ListContactListEmails(ctx context.Context, id string) (json.RawMessage, error) {
-	return c.get(ctx, "/api/agent/lists/"+url.PathEscape(id)+"/emails", nil)
+	return c.get(ctx, "/api/cli/lists/"+url.PathEscape(id)+"/emails", nil)
 }
 
 // AddEmailsToList adds emails to an existing contact list.
-// POST /api/agent/lists/:id/emails
+// POST /api/cli/lists/:id/emails
 func (c *Client) AddEmailsToList(ctx context.Context, id string, emails []string) (json.RawMessage, error) {
-	return c.post(ctx, "/api/agent/lists/"+url.PathEscape(id)+"/emails", map[string][]string{"emails": emails})
+	return c.post(ctx, "/api/cli/lists/"+url.PathEscape(id)+"/emails", map[string][]string{"emails": emails})
 }
 
 // RemoveEmailsFromList removes emails from an existing contact list.
-// DELETE /api/agent/lists/:id/emails
+// DELETE /api/cli/lists/:id/emails
 func (c *Client) RemoveEmailsFromList(ctx context.Context, id string, emails []string) (json.RawMessage, error) {
-	return c.del(ctx, "/api/agent/lists/"+url.PathEscape(id)+"/emails", nil, map[string][]string{"emails": emails})
+	return c.del(ctx, "/api/cli/lists/"+url.PathEscape(id)+"/emails", nil, map[string][]string{"emails": emails})
 }

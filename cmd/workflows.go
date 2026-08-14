@@ -8,8 +8,8 @@ import (
 )
 
 // workflowsCmd groups bulk file enrichment (upload → run → status → download)
-// and the integrations subtree. Endpoints live under /api/workflows/* and are
-// mirrored byte-for-byte from encrata/backend/internal/handlers.
+// and the integrations subtree. Endpoints live under /api/cli/workflows/* and
+// are rewritten at the edge to canonical /api/workflows/* handlers.
 var workflowsCmd = &cobra.Command{
 	Use:     "workflows",
 	Aliases: []string{"wf"},

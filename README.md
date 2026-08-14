@@ -244,6 +244,8 @@ encrata update
 | `email breaches` | Data-breach exposure for an address | 1/email |
 | `email bulk` | Validate a whole file/list (= `email validity --bulk`) | 1/email |
 
+API endpoint family: these commands now target `/api/cli/*` paths (`/api/cli/email-validity`, `/api/cli/email-enrich`, `/api/cli/email-identity`, `/api/cli/breaches`, `/api/cli/email-verify`, `/api/cli/email-validity-bulk`) rather than legacy `/api/agent/*` aliases.
+
 Every verb runs on one address, or on a file/STDIN list with `--bulk`.
 
 ---
@@ -374,6 +376,9 @@ Check whether a password has appeared in known data breaches (HIBP
 k-anonymity). Your password is hashed locally with SHA-1 and **only the hash is
 sent** — the plaintext never leaves your machine and is never logged, cached, or
 stored.
+
+API endpoint family: these commands target `/api/cli/password-breaches` and
+`/api/cli/password-breaches/bulk`.
 
 ```bash
 # Prompt interactively (no echo — never lands in shell history)
@@ -536,6 +541,8 @@ Options:
 Manage reusable contact lists — named collections of emails you can share across
 enrichment and monitoring workflows.
 
+API endpoint family: these commands target `/api/cli/lists*`.
+
 ```bash
 encrata lists list
 encrata lists create "Prospects" --emails a@example.com --emails b@example.com
@@ -655,6 +662,8 @@ Managing webhooks requires a selected workspace.
 Manage workspaces and their members (alias: `ws`). Member, `update`, and
 `delete` operations act on your **current (active) workspace**, which is tracked
 server-side — run `workspace switch <id>` first to change it.
+
+Workspace commands call the CLI workspace namespace: `/api/cli/workspaces*`.
 
 ```bash
 encrata workspace list

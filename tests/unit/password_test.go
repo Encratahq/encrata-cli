@@ -151,7 +151,7 @@ func TestBulkResultBreachDecision(t *testing.T) {
 // hash — never the plaintext — and parses the single-check response.
 func TestPasswordBreachesSendsHashOnly(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/agent/password-breaches" {
+		if r.URL.Path != "/api/cli/password-breaches" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		var body map[string]interface{}
@@ -188,7 +188,7 @@ func TestPasswordBreachesSendsHashOnly(t *testing.T) {
 // sha1s array (not plaintext) and parses the bulk response.
 func TestPasswordBreachesBulkSendsHashes(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/agent/password-breaches/bulk" {
+		if r.URL.Path != "/api/cli/password-breaches/bulk" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		var body map[string]interface{}

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-08-14
+
+### Added
+- Routing path migration hardening across CLI command groups and related docs.
+
+### Changed
+- Version bump for the latest CLI release package line.
+
 ## [0.9.1] - 2026-08-12
 
 ### Changed
@@ -64,6 +72,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The connected-account spreadsheet route is `/api/workflows/integrations/{id}/sheet`
   (not `/create-sheet`) and returns `{spreadsheet_id, spreadsheet_url, sheet_name}`.
 
-[Unreleased]: https://github.com/Encratahq/encrata-cli/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/Encratahq/encrata-cli/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.10.0
+[0.9.1]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.9.1
 [0.9.0]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.9.0
 [0.8.0]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.8.0

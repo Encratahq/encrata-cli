@@ -9,7 +9,7 @@ package version
 var (
 	// Version is the semantic version (without a leading "v"). Bumped per
 	// release; a new feature is a MINOR bump.
-	Version = "0.9.1"
+	Version = "0.10.0"
 	// Commit is the short git SHA the binary was built from.
 	Commit = "none"
 	// Date is the build timestamp (RFC3339) set by the release pipeline.
