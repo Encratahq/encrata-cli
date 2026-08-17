@@ -58,7 +58,14 @@ func runUpdate() error {
 
 	switch detectInstallMethod(exePath) {
 	case "npm":
-		return runManagerUpdate("npm", []string{"install", "-g", npmPackage + "@latest"})
+		// On Windows the running .exe is locked, so npm can't replace or delete
+		// the old copy. Hand off to a detached updater that runs after we exit.
+		if done, err := detachedNpmUpdate(exePath); err != nil {
+			output.Error("Could not start background update: " + err.Error() + " - falling back to in-place update.")
+		} else if done {
+			return nil
+		}
+		return runManagerUpdate("npm", []string{"install", "-g", "--no-fund", "--no-audit", npmPackage + "@latest"})
 	case "brew":
 		return runManagerUpdate("brew", []string{"upgrade", "encrata"})
 	default:
