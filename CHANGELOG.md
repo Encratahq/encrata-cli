@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-08-17
+
+### Changed
+- Maintenance release; no user-facing command changes.
+
 ## [0.11.1] - 2026-08-17
 
 ### Fixed
@@ -88,7 +93,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The connected-account spreadsheet route is `/api/workflows/integrations/{id}/sheet`
   (not `/create-sheet`) and returns `{spreadsheet_id, spreadsheet_url, sheet_name}`.
 
-[Unreleased]: https://github.com/Encratahq/encrata-cli/compare/v0.11.1...HEAD
+[Unreleased]: https://github.com/Encratahq/encrata-cli/compare/v0.11.2...HEAD
+[0.11.2]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.11.2
 [0.11.1]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.11.1
 [0.11.0]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.11.0
 [0.10.0]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.10.0
