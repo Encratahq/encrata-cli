@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-08-17
+
+### Changed
+- Default API base URL is now `https://cli.encrata.com` (was `https://api.encrata.com`).
+- Workflows commands (`encrata workflows` / `wf` and their subcommands) are
+  hidden from help and command listings. They remain functional if invoked
+  directly, but are no longer part of the documented surface.
+
 ## [0.10.0] - 2026-08-14
 
 ### Added
@@ -72,7 +80,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The connected-account spreadsheet route is `/api/workflows/integrations/{id}/sheet`
   (not `/create-sheet`) and returns `{spreadsheet_id, spreadsheet_url, sheet_name}`.
 
-[Unreleased]: https://github.com/Encratahq/encrata-cli/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/Encratahq/encrata-cli/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.11.0
 [0.10.0]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.10.0
 [0.9.1]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.9.1
 [0.9.0]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.9.0

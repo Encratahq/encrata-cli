@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	DefaultBaseURL = "https://api.encrata.com"
+	DefaultBaseURL = "https://cli.encrata.com"
 	EnvAPIKey      = "ENCRATA_API_KEY"
 	EnvBaseURL     = "ENCRATA_BASE_URL"
 )

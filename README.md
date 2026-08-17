@@ -205,7 +205,6 @@ encrata jobs --help
 encrata keys --help
 encrata webhooks --help
 encrata workspace --help
-encrata workflows --help
 encrata lists --help
 ```
 
@@ -682,49 +681,6 @@ Subcommands: `list`, `create`, `switch`, `update`, `delete`, and
 `members` (`list`, `invite`, `set-role`, `remove`).
 
 Valid member roles: `admin`, `tech`, `readonly` (the creator is the owner).
-
----
-
-### `encrata workflows`
-
-Bulk-enrich a file of emails and manage export destinations (alias: `wf`). Runs
-are asynchronous — start one, then poll its status and download the CSV.
-
-```bash
-encrata workflows upload emails.csv                   # → file id
-encrata workflows run WORKFLOW_ID --file FILE_ID      # → run id
-encrata workflows status RUN_ID                       # status + step breakdown
-encrata workflows runs --limit 20                     # recent runs
-encrata workflows download RUN_ID --out results.csv   # enriched CSV
-encrata workflows cancel RUN_ID
-```
-
-Subcommands: `upload`, `run`, `status`, `runs`, `cancel`, `download`, and
-`integrations` (`list`, `providers`, `session`, `save`, `create-sheet`,
-`disconnect`, alias `int`).
-
-Connected export destinations (Google Sheets, HubSpot, …) via Nango:
-
-```bash
-encrata workflows integrations list
-encrata workflows integrations providers
-encrata workflows integrations create-sheet INTEGRATION_ID --title "Enriched"
-encrata workflows integrations disconnect INTEGRATION_ID
-```
-
-Options:
-
-| Command | Flag | Description |
-| ------- | ---- | ----------- |
-| `upload` | `--workflow-id` | Attach the file to an existing workflow |
-| `run` | `--file` | Uploaded file id to enrich (required) |
-| `run` | `--idempotency-key` | Safely retry run creation without duplicates |
-| `runs` | `--workflow-id` / `--limit` / `--offset` | Filter and paginate |
-| `download` | `--out` | Output path (default `run-<id>.csv`) |
-| `cancel` / `integrations disconnect` | `--yes` | Skip the confirmation prompt |
-
-Runs are asynchronous: `run` returns immediately with a run id — poll `status`
-until it reports `success`, then `download`. Connection tokens are never printed.
 
 Options:
 

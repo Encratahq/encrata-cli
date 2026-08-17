@@ -13,6 +13,7 @@ import (
 var workflowsCmd = &cobra.Command{
 	Use:     "workflows",
 	Aliases: []string{"wf"},
+	Hidden:  true, // temporarily hidden from help/listings
 	Short:   "Bulk enrichment: upload a file, run it, download results",
 	Long: `Run bulk enrichment over a CSV/TXT/XLSX of emails.
 
