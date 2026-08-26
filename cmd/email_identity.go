@@ -20,7 +20,7 @@ Pass a single email to resolve it, or use --bulk with a file (or - for STDIN)
 to resolve a whole list concurrently.
 
 Examples:
-  encrata email identity user@example.com
+  encrata email identity jane@acme.com
   encrata email identity emails.csv --bulk
   encrata email identity emails.csv --bulk --out people.csv`,
 	Args: cobra.MaximumNArgs(1),
@@ -60,7 +60,7 @@ func runIdentityBulk(cmd *cobra.Command, path string) error {
 	if err := validateOnly(cmd, "found"); err != nil {
 		return err
 	}
-	_, emails, _, err := loadEmails(cmd, path)
+	fileName, emails, _, err := loadEmails(cmd, path)
 	if err != nil {
 		return err
 	}
@@ -68,7 +68,7 @@ func runIdentityBulk(cmd *cobra.Command, path string) error {
 	if err != nil {
 		return err
 	}
-	out, _ := cmd.Flags().GetString("out")
+	out := resolveResultOut(cmd, fileName)
 
 	concurrency, _ := cmd.Flags().GetInt("concurrency")
 	if concurrency < 1 {

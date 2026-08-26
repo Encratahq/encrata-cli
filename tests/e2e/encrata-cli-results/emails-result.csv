@@ -1,0 +1,3 @@
+email,status,reason,message,confidence,disposable,role,role_name,free_provider,provider,did_you_mean,canonical,domain,mx,smtp_mx_host,smtp_catch_all,smtp_greylisted,trust_grade,spf,dmarc,dmarc_policy,dkim,mta_sts,tls_rpt,bimi,dnssec,person_signal_count,person_signal_sources,registrar,domain_created_at,domain_age_days,breaches_count,gravatar,registered_services,google_account,checked_at
+one@example.com,valid,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+two@example.com,invalid,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,

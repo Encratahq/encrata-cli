@@ -18,7 +18,7 @@ to stream a whole list. Add --fail-on-finding to exit with code 2 when any
 email is breached (otherwise the command exits 0).
 
 Examples:
-  encrata email breaches user@example.com
+  encrata email breaches jane@acme.com
   encrata email breaches emails.csv --bulk
   encrata email breaches emails.csv --bulk --out breaches.csv`,
 	Args: cobra.MaximumNArgs(1),

@@ -18,10 +18,8 @@ type AccountAPI interface {
 // EmailAPI exposes single- and bulk-email intelligence lookups.
 type EmailAPI interface {
 	EmailValidity(ctx context.Context, email string) (json.RawMessage, error)
-	EmailEnrich(ctx context.Context, email string) (json.RawMessage, error)
 	EmailIdentity(ctx context.Context, email string) (json.RawMessage, error)
 	EmailBreaches(ctx context.Context, email string) (json.RawMessage, error)
-	EmailVerify(ctx context.Context, email string) (json.RawMessage, error)
 	EmailValidityBulk(ctx context.Context, emails []string) (json.RawMessage, error)
 }
 
@@ -80,6 +78,15 @@ type JobsAPI interface {
 	IdentityJobAPI
 	PasswordJobAPI
 	BulkJobAPI
+}
+
+// ExportsAPI exposes the shared async, cached export pipeline: the server builds
+// the result file once (streamed into S3, cached) and hands back a presigned URL.
+type ExportsAPI interface {
+	CreateExport(ctx context.Context, kind, id, format, filter string) (*ExportState, error)
+	ExportStatus(ctx context.Context, kind, id, format, filter string) (*ExportState, error)
+	ExportDownloadURL(ctx context.Context, kind, id, format, filter string) (*ExportState, error)
+	FetchURL(ctx context.Context, rawURL string) ([]byte, error)
 }
 
 // KeysAPI exposes API-key management.
@@ -166,6 +173,7 @@ type API interface {
 	IntegrationsAPI
 	WorkspaceAPI
 	BulkSearchAPI
+	ExportsAPI
 }
 
 var _ API = (*Client)(nil)

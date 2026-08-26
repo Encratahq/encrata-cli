@@ -20,6 +20,7 @@ func (c *Client) setHeaders(req *http.Request, hasBody bool) {
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.APIKey)
+	req.Header.Set("X-Api-Key", c.APIKey)
 	req.Header.Set("User-Agent", c.UserAgent)
 }
 

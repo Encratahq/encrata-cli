@@ -20,6 +20,9 @@ func resultsNonValidityJob(cmd *cobra.Command, args []string, jt string) error {
 	pageSize, _ := cmd.Flags().GetInt("page-size")
 	breached, _ := cmd.Flags().GetBool("breached")
 	foundOnly, _ := cmd.Flags().GetBool("found-only")
+	_, _, onlyFound, onlyBreached := resolveOnlyFilters(cmd)
+	breached = breached || onlyBreached
+	foundOnly = foundOnly || onlyFound
 
 	spinner := startSpinner("Loading results...")
 	data, err := s.results(cmd.Context(), client, args[0], page, pageSize, breached, foundOnly)
@@ -46,30 +49,21 @@ func resultsNonValidityJob(cmd *cobra.Command, args []string, jt string) error {
 // ── download ────────────────────────────────────────────────────────────────
 
 func downloadNonValidityJob(cmd *cobra.Command, args []string, jt string) error {
-	s := strategyFor(jt)
 	client, err := newClient()
 	if err != nil {
 		return err
 	}
-	breached, _ := cmd.Flags().GetBool("breached")
-	foundOnly, _ := cmd.Flags().GetBool("found-only")
 	out, _ := cmd.Flags().GetString("out")
-
-	spinner := startSpinner("Downloading results...")
-	blob, err := s.download(cmd.Context(), client, args[0], breached, foundOnly)
-	stopSpinner(spinner)
-	if err != nil {
-		return jobsError(err)
+	format, ferr := resolveExportFormat(flagString(cmd, "format"), out)
+	if ferr != nil {
+		return friendlyFormatError(cmd, ferr.Error())
 	}
-	if out == "" {
-		fmt.Print(string(blob))
-		return nil
+	if out == "" && !jsonMode() && (format == "csv" || format == "xlsx") {
+		out = defaultResultPath(args[0], format)
 	}
-	if err := writeFileBytes(out, blob); err != nil {
-		return err
-	}
-	output.SuccessMsg("Wrote results to " + out)
-	return nil
+	// Server-built cached export (streamed from S3), replacing the old sync
+	// streaming download that pulled every row into the CLI.
+	return runJobExport(cmd.Context(), client, jt, args[0], out, format, nonValidityExportFilter(cmd, jt))
 }
 
 // ── cancel ──────────────────────────────────────────────────────────────────

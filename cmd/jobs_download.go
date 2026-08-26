@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/Encratahq/cli/internal/output"
@@ -25,6 +24,9 @@ var jobsResultsCmd = &cobra.Command{
 			return err
 		}
 		status, _ := cmd.Flags().GetString("status")
+		if status == "" {
+			status = validityOnlyStatus(cmd)
+		}
 		page, _ := cmd.Flags().GetInt("page")
 
 		spinner := startSpinner("Loading results...")
@@ -70,77 +72,17 @@ var jobsDownloadCmd = &cobra.Command{
 			return err
 		}
 		format, _ := cmd.Flags().GetString("format")
-		status, _ := cmd.Flags().GetString("status")
-		validOnly, _ := cmd.Flags().GetBool("valid-only")
 		out, _ := cmd.Flags().GetString("out")
 
 		if format != "csv" && format != "json" && format != "xlsx" {
 			return friendlyFormatError(cmd, "format must be csv, xlsx, or json")
 		}
-		if validOnly {
-			status = "valid"
-		}
-
 		if out == "" && (format == "csv" || format == "xlsx") {
-			out = defaultValidityDownloadName(format)
+			out = defaultResultPath(args[0], format)
 		}
 
-		spinner := startSpinner("Downloading results...")
-		apiFormat := format
-		if format == "xlsx" || format == "csv" {
-			apiFormat = "json"
-		}
-		blob, err := client.DownloadValidityJob(cmd.Context(), args[0], status, apiFormat)
-		stopSpinner(spinner)
-		if err != nil {
-			output.Error(err.Error())
-			return err
-		}
-
-		if format == "xlsx" || format == "csv" {
-			raw := unwrapArray(json.RawMessage(blob), "results")
-			rows := make([]map[string]interface{}, 0, len(raw))
-			for _, item := range raw {
-				if m, ok := item.(map[string]interface{}); ok {
-					rows = append(rows, m)
-				}
-			}
-			rows = filterRowsByStatus(rows, status)
-
-			if format == "xlsx" {
-				if out == "" {
-					out = defaultValidityDownloadName("xlsx")
-				}
-				if err := writeXLSX(out, selectExportColumns(nil), rows); err != nil {
-					return err
-				}
-				output.SuccessMsg(fmt.Sprintf("Wrote %d %s to %s", len(rows), plural(len(rows), "row", "rows"), out))
-				return nil
-			}
-
-			csvBlob, err := buildFlatCSV(selectExportColumns(nil), rows)
-			if err != nil {
-				return err
-			}
-			if out == "" {
-				fmt.Print(string(csvBlob))
-				return nil
-			}
-			if err := writeFileBytes(out, csvBlob); err != nil {
-				return err
-			}
-			output.SuccessMsg(fmt.Sprintf("Wrote %d %s to %s", len(rows), plural(len(rows), "row", "rows"), out))
-			return nil
-		}
-
-		if out == "" {
-			fmt.Print(string(blob))
-			return nil
-		}
-		if err := writeFileBytes(out, blob); err != nil {
-			return err
-		}
-		output.SuccessMsg("Wrote results to " + out)
-		return nil
+		// Server-built cached export (streamed from S3), replacing the old sync
+		// streaming download that pulled every row into the CLI to flatten locally.
+		return runJobExport(cmd.Context(), client, "validity", args[0], out, format, validityExportFilter(cmd))
 	},
 }

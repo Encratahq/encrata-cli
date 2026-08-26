@@ -47,7 +47,7 @@ var rootCmd = &cobra.Command{
 		"\033[1;38;5;173mencrata\033[0m",
 		"\033[38;5;245mintelligence lookups from your terminal\033[0m",
 		"\033[38;5;173mencrata config set-key\033[0m <your-api-key>",
-		"\033[38;5;173mencrata email validity\033[0m user@example.com",
+		"\033[38;5;173mencrata email validity\033[0m jane@acme.com",
 		"\033[38;5;173mencrata email bulk\033[0m emails.csv --out results.csv",
 		"\033[38;5;109mhttps://docs.encrata.com\033[0m"),
 	SilenceUsage:  true,

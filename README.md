@@ -63,10 +63,10 @@ encrata version
 encrata config set-key YOUR_API_KEY
 
 # Run your first lookup
-encrata email validity user@example.com
+encrata email validity jane@acme.com
 
 # Get the full API response
-encrata email enrich user@example.com --json
+encrata email validity jane@acme.com --json
 ```
 
 ---
@@ -85,7 +85,7 @@ The CLI resolves your API key using this priority chain:
 
 | Priority | Source | How to set |
 | -------- | ------ | ---------- |
-| 1 | `--api-key` flag | `encrata email validity user@example.com --api-key YOUR_API_KEY` |
+| 1 | `--api-key` flag | `encrata email validity jane@acme.com --api-key YOUR_API_KEY` |
 | 2 | `ENCRATA_API_KEY` env var | `export ENCRATA_API_KEY=YOUR_API_KEY` |
 | 3 | Config file | `encrata login YOUR_API_KEY` (or `config set-key`) |
 
@@ -206,6 +206,7 @@ encrata keys --help
 encrata webhooks --help
 encrata workspace --help
 encrata lists --help
+encrata workflows --help
 ```
 
 ---
@@ -237,13 +238,11 @@ encrata update
 | Command | Use it for | Credits |
 | ------- | ---------- | ------- |
 | `email validity` | Deliverability verdict (valid/invalid/catch-all/risky) **+ full report** | 1/email |
-| `email verify` | Quick deep-SMTP yes/no — is the mailbox reachable? | Free |
-| `email enrich` | Validity **+ company & domain** signals (the `validity --full` data) | 1/email |
 | `email identity` | The **person** — name, role, company, socials, breaches | 1000/email |
 | `email breaches` | Data-breach exposure for an address | 1/email |
 | `email bulk` | Validate a whole file/list (= `email validity --bulk`) | 1/email |
 
-API endpoint family: these commands now target `/api/cli/*` paths (`/api/cli/email-validity`, `/api/cli/email-enrich`, `/api/cli/email-identity`, `/api/cli/breaches`, `/api/cli/email-verify`, `/api/cli/email-validity-bulk`) rather than legacy `/api/agent/*` aliases.
+API endpoint family: these commands now target `/api/cli/*` paths (`/api/cli/email-validity`, `/api/cli/email-identity`, `/api/cli/breaches`, `/api/cli/email-validity-bulk`) rather than legacy `/api/agent/*` aliases.
 
 Every verb runs on one address, or on a file/STDIN list with `--bulk`.
 
@@ -256,8 +255,8 @@ Check whether a single email address is valid and deliverable. Returns
 disposable/role flags, provider and SMTP detail.
 
 ```bash
-encrata email validity user@example.com
-encrata email validity user@example.com --json
+encrata email validity jane@acme.com
+encrata email validity jane@acme.com --json
 
 # Validate a whole file (or STDIN) — same engine as `email bulk`
 encrata email validity emails.csv --bulk
@@ -270,17 +269,6 @@ flags: `--out`, `--format`, `--only valid|invalid|found`, `--stream`, `--job`,
 
 ---
 
-### `encrata email enrich`
-
-Validate an email and enrich it with person and company data.
-
-```bash
-encrata email enrich user@example.com
-encrata email enrich user@example.com --json
-```
-
----
-
 ### `encrata email identity`
 
 Resolve the identity and social profiles behind an email address. Pass a single
@@ -289,8 +277,8 @@ concurrently.
 
 ```bash
 # Single email
-encrata email identity user@example.com
-encrata email identity user@example.com --json
+encrata email identity jane@acme.com
+encrata email identity jane@acme.com --json
 
 # Bulk from a file (or STDIN)
 encrata email identity emails.csv --bulk
@@ -313,8 +301,8 @@ whole list with a live progress bar.
 
 ```bash
 # Single email
-encrata email breaches user@example.com
-encrata email breaches user@example.com --json
+encrata email breaches jane@acme.com
+encrata email breaches jane@acme.com --json
 
 # Bulk from a file (or STDIN)
 encrata email breaches emails.csv --bulk
@@ -351,21 +339,6 @@ Exit codes (usable as a CI / sign-up guard, mirroring `encrata password`):
 | `2` | A breach was found (only with `--fail-on-finding`) |
 | `3` | Authentication failed |
 | `4` | Insufficient credits |
-
----
-
-### `encrata email verify`
-
-Deep SMTP-level deliverability check of a single address — connects to the mail
-server to confirm the mailbox. **Free.** Use `verify` for a quick
-deliverable/undeliverable answer; use `validity` when you also need the full
-report (confidence, domain trust, disposable/role flags, provider, SMTP detail
-— costs 1 credit).
-
-```bash
-encrata email verify user@example.com
-encrata email verify user@example.com --json
-```
 
 ---
 
@@ -450,8 +423,8 @@ Options:
 | Flag | Description |
 | ---- | ----------- |
 | `--stream` | Force live streaming (SSE) mode |
-| `--job` | Force async job mode |
-| `--enrich` | Run the full per-email report so every column is filled (1 credit per email) |
+| `--job` | Run as an async job and wait here (same engine as `jobs`; use `jobs` to start one and return later) |
+| `--enrich` | Fill every export column with the full per-email report (same 1 credit/email, just slower) |
 | `--concurrency` | Parallel lookups when `--enrich` is set (default 8) |
 | `--out` | Write results to a file (`.csv`, `.xlsx`, or `.json`) |
 | `--format` | Export format: `csv`, `xlsx`, or `json` (default: inferred from `--out`) |
@@ -459,8 +432,10 @@ Options:
 | `--only` | Export only matching rows: `valid`, `invalid`, or `found` |
 
 Batches larger than 1,000 emails automatically switch to job mode unless
-`--stream` is set. The lean path bills 1 credit per successful unique email;
-`--enrich` bills 1 credit per email (full report), so it is opt-in.
+`--stream` is set (the CLI prints a notice when it does). Both paths bill 1
+credit per successful unique email - the difference is speed vs detail: the lean
+default returns `email`, `status`, `reason` fast, while `--enrich` runs the full
+per-email report (all columns) and is slower.
 
 #### Export columns
 
@@ -522,16 +497,69 @@ Options:
 | `create` | `--file-name` | Optional display name |
 | `results` | `--status` | Validity: filter by per-row status |
 | `results` | `--page` / `--page-size` | Pagination |
-| `results` | `--found-only` | Identity: only enriched rows |
-| `results` | `--breached` | Password: only breached rows |
+| `results` | `--only` | Keep only matching rows: `valid`, `invalid`, `found`, or `breached` |
 | `download` | `--format` | Validity: `csv`, `xlsx`, or `json` |
-| `download` | `--valid-only` / `--found-only` / `--breached` | Per-type row filters |
+| `download` | `--only` | Keep only matching rows: `valid`, `invalid`, `found`, or `breached` |
 | `download` | `--out` | Write to a file instead of stdout |
 | `retry` | | Re-drive dead-lettered chunks (validity/identity; password has no retry) |
+
+> `--only` is the single row filter across `email bulk`, `email breaches`, and
+> `jobs`. The older `--valid-only` / `--found-only` / `--breached` flags still
+> work as hidden aliases.
 
 > **Note:** `jobs <verb> --type` is the single async-job surface. The former
 > standalone `identity-jobs` / `password-jobs` groups and the MCP-style names
 > (`bulk-validate-emails`, `get-email-job-status`, …) have been removed.
+
+---
+
+### `encrata workflows` (alias: `wf`)
+
+Run a saved workflow against a CSV, TXT, or XLSX file, track the run, and
+download the resulting enriched CSV. The workflow itself is created and
+configured in the Encrata app; the CLI provides the bulk execution flow.
+
+```bash
+# 1. Upload source emails and copy the returned file ID
+encrata workflows upload emails.xlsx
+
+# 2. Start the saved workflow over that file
+encrata workflows run WORKFLOW_ID --file FILE_ID
+
+# 3. Check progress, then download the completed CSV
+encrata workflows status RUN_ID
+encrata workflows download RUN_ID --out enriched-results.csv
+
+# Manage or filter workflow runs
+encrata workflows runs --workflow-id WORKFLOW_ID
+encrata workflows cancel RUN_ID --yes
+```
+
+Subcommands:
+
+| Command | Description |
+| ------- | ----------- |
+| `upload <file>` | Upload a CSV, TXT, or XLSX input file; `--workflow-id` optionally associates it with a workflow. |
+| `run <workflow-id>` | Start a bulk run; requires `--file <file-id>`. |
+| `status <run-id>` | Show the run state, credit use, output rows, and step results. |
+| `runs` | List runs; use `--workflow-id`, `--limit`, and `--offset` to filter or paginate. |
+| `cancel <run-id>` | Request cooperative cancellation; add `--yes` to skip the prompt. |
+| `download <run-id>` | Save the run's generated CSV; `--out` defaults to `run-<id>.csv`. |
+| `integrations` (`int`) | Manage connected destinations such as Google Sheets, HubSpot, and Salesforce. |
+
+For connected export destinations:
+
+```bash
+encrata workflows integrations providers
+encrata workflows integrations list
+encrata workflows integrations create-sheet INTEGRATION_ID --title "Enriched leads"
+encrata workflows integrations disconnect INTEGRATION_ID --yes
+```
+
+Use `encrata workflows integrations session --json` to retrieve the short-lived
+Nango Connect session token for a browser-based connection flow, then save the
+completed connection with `integrations save --connection-id ...
+--provider-config-key ...`.
 
 ---
 
@@ -729,10 +757,8 @@ de-duplicated, and invalid or failed checks are not charged.
 | Command | Credits |
 | ------- | ------- |
 | `email validity` | 1 credit per successful email |
-| `email enrich` | 1 credit per successful email |
 | `email identity` | 1 credit per successful email |
 | `email breaches` | 1 credit per successful email (single or `--bulk`) |
-| `email verify` | 1 credit per successful email |
 | `email bulk` | 1 credit per successful unique email |
 | `jobs` (validity / identity) | 1 credit per successful unique email |
 | `jobs --type password` | 1 credit per unique password hash |
@@ -772,14 +798,14 @@ go test ./...
 
 ```bash
 go run . version
-go run . email validity user@example.com
+go run . email validity jane@acme.com
 ```
 
 4. Point local runs at a local backend.
 
 ```powershell
 $env:ENCRATA_BASE_URL = "http://localhost:8080"
-go run . email enrich user@example.com
+go run . email validity jane@acme.com
 ```
 
 ### Build locally

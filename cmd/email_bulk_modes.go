@@ -86,10 +86,13 @@ func runBulkEnrich(cmd *cobra.Command, client api.API, emails []string, out stri
 	}
 
 	fmt.Println()
-	fmt.Println()
 	printBulkSummaryLine(results)
 	// Bulk always persists rows; exportBulk auto-names the file when --out is empty.
-	return exportBulk(cmd, out, results)
+	if err := exportBulk(cmd, out, results); err != nil {
+		return err
+	}
+	printLeanExportHint(cmd, out)
+	return nil
 }
 
 func runBulkStream(cmd *cobra.Command, client api.API, emails []string, fileName, out string, fields []string) error {
@@ -145,5 +148,9 @@ func runBulkStream(cmd *cobra.Command, client api.API, emails []string, fileName
 	fmt.Println()
 	printBulkSummaryLine(results)
 	// Bulk always persists rows; exportBulk auto-names the file when --out is empty.
-	return exportBulk(cmd, out, results)
+	if err := exportBulk(cmd, out, results); err != nil {
+		return err
+	}
+	printLeanExportHint(cmd, out)
+	return nil
 }

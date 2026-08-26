@@ -558,77 +558,87 @@ func TestBulkExportXLSX(t *testing.T) {
 }
 
 func TestJobsDownloadXLSXValidOnly(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/cli/validity-jobs/download" {
+	// The CLI now delegates to the shared async export pipeline: it enqueues a
+	// build, polls status, then downloads the server-built file from a presigned
+	// URL. This test asserts that orchestration and the saved bytes.
+	const fileBody = "PK\x03\x04 server-built xlsx bytes"
+	var gotKind, gotFormat, gotFilter, gotID string
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/cli/exports":
+			var body struct{ Kind, ID, Format, Filter string }
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			gotKind, gotID, gotFormat, gotFilter = body.Kind, body.ID, body.Format, body.Filter
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `{"status":"ready","url":"`+srv.URL+`/blob"}`)
+		case "/api/cli/exports/download":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `{"status":"ready","url":"`+srv.URL+`/blob"}`)
+		case "/blob":
+			_, _ = io.WriteString(w, fileBody)
+		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
-		if got := r.URL.Query().Get("status"); got != "valid" {
-			t.Fatalf("expected status=valid query, got %q", got)
-		}
-		if got := r.URL.Query().Get("format"); got != "json" {
-			t.Fatalf("expected format=json query for xlsx conversion, got %q", got)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, `{"results":[`+enrichedResult+`]}`)
 	}))
-	defer server.Close()
+	defer srv.Close()
 
 	out := filepath.Join(t.TempDir(), "job-results.xlsx")
-	env := map[string]string{"ENCRATA_API_KEY": "test-key", "ENCRATA_BASE_URL": server.URL}
+	env := map[string]string{"ENCRATA_API_KEY": "test-key", "ENCRATA_BASE_URL": srv.URL}
 
 	if o, err := runCLI(t, env, "jobs", "download", "job_123", "--format", "xlsx", "--valid-only", "--out", out); err != nil {
 		t.Fatalf("jobs xlsx download failed: %v\n%s", err, o)
 	}
 
-	zr, err := zip.OpenReader(out)
+	if gotKind != "validity" || gotID != "job_123" || gotFormat != "xlsx" || gotFilter != "valid" {
+		t.Fatalf("export request = {kind:%q id:%q format:%q filter:%q}, want validity/job_123/xlsx/valid",
+			gotKind, gotID, gotFormat, gotFilter)
+	}
+	got, err := os.ReadFile(out)
 	if err != nil {
-		t.Fatalf("xlsx is not a valid zip: %v", err)
+		t.Fatalf("failed to read output: %v", err)
 	}
-	defer zr.Close()
-
-	var sheet string
-	for _, file := range zr.File {
-		if file.Name == "xl/worksheets/sheet1.xml" {
-			rc, err := file.Open()
-			if err != nil {
-				t.Fatalf("failed to open sheet: %v", err)
-			}
-			b, _ := io.ReadAll(rc)
-			rc.Close()
-			sheet = string(b)
-		}
-	}
-	if sheet == "" {
-		t.Fatalf("xlsx missing xl/worksheets/sheet1.xml")
-	}
-	for _, want := range []string{"rich@example.com", "status", "reason"} {
-		if !strings.Contains(sheet, want) {
-			t.Fatalf("expected sheet to contain %q", want)
-		}
+	if string(got) != fileBody {
+		t.Fatalf("output = %q, want the server-built file bytes", string(got))
 	}
 }
 
 func TestJobsDownloadCSVValidOnlyCanonicalColumns(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/cli/validity-jobs/download" {
+	// Columns are now produced server-side (canonical schema). The CLI enqueues
+	// the export and saves the server-built CSV verbatim; this test serves that
+	// CSV from a presigned URL and asserts the CLI writes it unchanged.
+	const csvBody = "email,status,reason,mx,trust_grade,google_account,free_provider,disposable\n" +
+		"rich@example.com,valid,accepted,mx1.example.com | mx2.example.com,A,yes,yes,no\n"
+	var gotKind, gotFormat, gotFilter string
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/cli/exports":
+			var body struct{ Kind, ID, Format, Filter string }
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			gotKind, gotFormat, gotFilter = body.Kind, body.Format, body.Filter
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `{"status":"ready","url":"`+srv.URL+`/blob"}`)
+		case "/api/cli/exports/download":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `{"status":"ready","url":"`+srv.URL+`/blob"}`)
+		case "/blob":
+			_, _ = io.WriteString(w, csvBody)
+		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
-		if got := r.URL.Query().Get("status"); got != "valid" {
-			t.Fatalf("expected status=valid query, got %q", got)
-		}
-		if got := r.URL.Query().Get("format"); got != "json" {
-			t.Fatalf("expected format=json query for local CSV flattening, got %q", got)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, `{"results":[`+enrichedResult+`,`+bareResult+`]}`)
 	}))
-	defer server.Close()
+	defer srv.Close()
 
 	out := filepath.Join(t.TempDir(), "job-results.csv")
-	env := map[string]string{"ENCRATA_API_KEY": "test-key", "ENCRATA_BASE_URL": server.URL}
+	env := map[string]string{"ENCRATA_API_KEY": "test-key", "ENCRATA_BASE_URL": srv.URL}
 
 	if o, err := runCLI(t, env, "jobs", "download", "job_123", "--format", "csv", "--valid-only", "--out", out); err != nil {
 		t.Fatalf("jobs csv download failed: %v\n%s", err, o)
+	}
+
+	if gotKind != "validity" || gotFormat != "csv" || gotFilter != "valid" {
+		t.Fatalf("export request = {kind:%q format:%q filter:%q}, want validity/csv/valid", gotKind, gotFormat, gotFilter)
 	}
 
 	f, err := os.Open(out)
@@ -649,7 +659,7 @@ func TestJobsDownloadCSVValidOnlyCanonicalColumns(t *testing.T) {
 		t.Fatalf("unexpected leading columns: %v", header[:3])
 	}
 	if colIndex(header, "mx") < 0 || colIndex(header, "trust_grade") < 0 || colIndex(header, "google_account") < 0 {
-		t.Fatalf("expected canonical flattened columns, got: %v", header)
+		t.Fatalf("expected canonical columns, got: %v", header)
 	}
 
 	row := records[1]
@@ -962,28 +972,6 @@ func TestEmailIdentityRendersPersonBlock(t *testing.T) {
 	for _, want := range []string{"Venkat Rao", "Founder", "Unosend", "Bengaluru", "Work history", "IIT", "linkedin"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("expected identity output to contain %q, got:\n%s", want, out)
-		}
-	}
-}
-
-func TestEmailVerifyRendersStatus(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/cli/email-verify" {
-			t.Fatalf("unexpected path: %s", r.URL.Path)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, `{"email":"x@y.com","status":"valid"}`)
-	}))
-	defer server.Close()
-
-	env := map[string]string{"ENCRATA_API_KEY": "test-key", "ENCRATA_BASE_URL": server.URL}
-	out, err := runCLI(t, env, "email", "verify", "x@y.com")
-	if err != nil {
-		t.Fatalf("email verify failed: %v\n%s", err, out)
-	}
-	for _, want := range []string{"Result", "valid", "Deliverable"} {
-		if !strings.Contains(out, want) {
-			t.Fatalf("expected verify output to contain %q, got:\n%s", want, out)
 		}
 	}
 }

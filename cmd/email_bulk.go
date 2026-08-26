@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Encratahq/cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -17,6 +18,13 @@ var emailBulkCmd = &cobra.Command{
 	Long: `Validate many emails at once. Emails are read from a CSV/text file argument
 or from STDIN. Small batches stream live results; large batches (or --job) run as
 an async job that is polled to completion.
+
+By default only email,status,reason are returned. Add --enrich to fill every
+export column (provider, mx, trust grade, ...). Results print to the terminal;
+pass --out to also save them to a .csv/.xlsx/.json file.
+
+--job runs the batch as an async job and waits for it here. Use the ` + "`jobs`" + `
+command instead when you want to start a job and come back for it later.
 
 Examples:
   encrata email bulk emails.csv
@@ -37,8 +45,8 @@ func init() {
 // includeOut adds --out for commands that don't already provide it.
 func registerBulkFlags(cmd *cobra.Command, includeOut bool) {
 	cmd.Flags().Bool("stream", false, "Force live streaming (SSE) mode")
-	cmd.Flags().Bool("job", false, "Force async job mode")
-	cmd.Flags().Bool("enrich", false, "Run the full per-email report so every column is filled (1 credit per email)")
+	cmd.Flags().Bool("job", false, "Run as an async job and wait here (same engine as the `jobs` command)")
+	cmd.Flags().Bool("enrich", false, "Fill every export column with the full per-email report (same 1 credit/email, slower)")
 	cmd.Flags().Int("concurrency", 8, "Parallel lookups when --enrich is set")
 	cmd.Flags().String("format", "", "Export format: csv, xlsx, or json (default: inferred from --out)")
 	cmd.Flags().StringSlice("columns", nil, "Columns to export (email, status, reason always included)")
@@ -79,7 +87,6 @@ func runEmailBulk(cmd *cobra.Command, args []string) error {
 	if forceStream && forceJob {
 		return friendlyFormatError(cmd, "choose either --stream or --job, not both")
 	}
-	out, _ := cmd.Flags().GetString("out")
 	fields, _ := cmd.Flags().GetStringSlice("fields")
 
 	path := ""
@@ -90,6 +97,8 @@ func runEmailBulk(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	// No --out: auto-name after the uploaded file under encrata-cli-results/.
+	out := resolveResultOut(cmd, fileName)
 
 	client, err := newClient()
 	if err != nil {
@@ -102,6 +111,9 @@ func runEmailBulk(cmd *cobra.Command, args []string) error {
 
 	useJob := forceJob || (!forceStream && len(emails) > bulkStreamThreshold)
 	if useJob {
+		if !forceJob && !jsonMode() {
+			output.Dim.Printf("  %d emails exceeds %d, running as an async job (use --stream to force live).\n", len(emails), bulkStreamThreshold)
+		}
 		return runBulkJob(cmd, client, fileName, raw, out)
 	}
 	return runBulkStream(cmd, client, emails, fileName, out, fields)

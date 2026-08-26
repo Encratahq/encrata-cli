@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-08-26
+
+### Removed
+- `email verify` and `email enrich` commands (and their `/api/cli/email-verify`
+  and `/api/cli/email-enrich` calls) - these are no longer backed by the API.
+  Use `email validity` for the deliverability verdict and full report.
+
+### Changed
+- Unified row filtering on a single `--only valid|invalid|found|breached` flag
+  across `email bulk`, `email breaches`, and `jobs results` / `jobs download`.
+  The old `--valid-only` / `--found-only` / `--breached` flags still work as
+  hidden aliases.
+- Clarified `email bulk` help: `--job` runs and waits like the `jobs` command,
+  and `--enrich` fills every export column (same 1 credit/email, just slower).
+- Example addresses in help now use `jane@acme.com` instead of
+  `user@example.com`.
+
+### Added
+- `email bulk` prints a notice when a batch auto-switches to async job mode
+  (>1000 emails), and a hint that lean exports only fill `email,status,reason`
+  unless `--enrich` is set.
+
 ## [0.11.2] - 2026-08-17
 
 ### Changed
@@ -93,7 +115,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The connected-account spreadsheet route is `/api/workflows/integrations/{id}/sheet`
   (not `/create-sheet`) and returns `{spreadsheet_id, spreadsheet_url, sheet_name}`.
 
-[Unreleased]: https://github.com/Encratahq/encrata-cli/compare/v0.11.2...HEAD
+[Unreleased]: https://github.com/Encratahq/encrata-cli/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.12.0
 [0.11.2]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.11.2
 [0.11.1]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.11.1
 [0.11.0]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.11.0

@@ -55,23 +55,17 @@ func runBulkJob(cmd *cobra.Command, client api.API, fileName string, raw []byte,
 	printJob(final)
 
 	if out != "" {
-		// Download the raw result objects and flatten them client-side so job
-		// exports use the same column set and formats as streaming exports.
-		spinner := startSpinner("Downloading results...")
-		blob, err := client.DownloadValidityJob(cmd.Context(), final.ID, "", "json")
-		stopSpinner(spinner)
-		if err != nil {
-			output.Error(err.Error())
+		// Server-built cached export: the file is streamed into S3 once and pulled
+		// from a presigned URL, so a 1M-row job never loads every row into the CLI.
+		format, ferr := resolveExportFormat(flagString(cmd, "format"), out)
+		if ferr != nil {
+			return friendlyFormatError(cmd, ferr.Error())
+		}
+		if err := runJobExport(cmd.Context(), client, "validity", final.ID, out, format, validityExportFilter(cmd)); err != nil {
 			return err
 		}
-		raw := unwrapArray(json.RawMessage(blob), "results")
-		results := make([]map[string]interface{}, 0, len(raw))
-		for _, item := range raw {
-			if m, ok := item.(map[string]interface{}); ok {
-				results = append(results, m)
-			}
-		}
-		return exportBulk(cmd, out, results)
+		printLeanExportHint(cmd, out)
+		return nil
 	}
 	return nil
 }

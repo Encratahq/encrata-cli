@@ -18,34 +18,28 @@ import (
 var emailCmd = &cobra.Command{
 	Use:   "email",
 	Short: "Email intelligence lookups",
-	Long: `Validate, enrich, and investigate email addresses.
+	Long: `Validate, resolve, and investigate email addresses.
 
 Examples:
-  encrata email validity  user@example.com
-  encrata email enrich    user@example.com
-  encrata email identity  user@example.com
-  encrata email breaches  user@example.com
-  encrata email verify    user@example.com
+  encrata email validity  jane@acme.com
+  encrata email identity  jane@acme.com
+  encrata email breaches  jane@acme.com
   encrata email bulk      emails.csv --out results.csv`,
 }
 
 func init() {
 	emailCmd.AddCommand(
 		emailValidityCmd,
-		emailEnrichCmd,
 		emailIdentityCmd,
 		emailBreachesCmd,
-		emailVerifyCmd,
 		emailBulkCmd,
 	)
 
 	// Single-email commands can write the full JSON payload to a file.
 	for _, c := range []*cobra.Command{
 		emailValidityCmd,
-		emailEnrichCmd,
 		emailIdentityCmd,
 		emailBreachesCmd,
-		emailVerifyCmd,
 	} {
 		c.Flags().String("out", "", "Write the full JSON result to a file")
 	}

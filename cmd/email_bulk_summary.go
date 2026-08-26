@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Encratahq/cli/internal/output"
+	"github.com/spf13/cobra"
 )
 
 // normStatus normalizes a validity status for bucketing.
@@ -73,6 +74,18 @@ func printBulkSummaryLine(results []map[string]interface{}) {
 		output.Brand.Sprintf("%d", risky),
 		credits,
 	)
+}
+
+// printLeanExportHint reminds the user that a lean (non-enriched) export only
+// fills email/status/reason, and that --enrich populates the rest.
+func printLeanExportHint(cmd *cobra.Command, out string) {
+	if out == "" || jsonMode() {
+		return
+	}
+	if enrich, _ := cmd.Flags().GetBool("enrich"); enrich {
+		return
+	}
+	output.Dim.Println("  Only email,status,reason are filled. Add --enrich for the full report columns.")
 }
 
 // printResultsTable renders Email | Status | Reason plus any --fields columns.

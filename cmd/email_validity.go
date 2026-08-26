@@ -13,7 +13,7 @@ var emailValidityCmd = &cobra.Command{
 Charges 1 credit on success; invalid or failed checks are not charged.
 
 Examples:
-  encrata email validity user@example.com
+  encrata email validity jane@acme.com
   encrata email validity emails.csv --bulk
   encrata email validity emails.csv --bulk --out results.csv --only valid`,
 	Args: cobra.MaximumNArgs(1),

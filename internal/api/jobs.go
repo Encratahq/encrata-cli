@@ -17,8 +17,10 @@ type Job struct {
 	BatchID        string `json:"batch_id,omitempty"`
 	TotalEmails    int    `json:"total_emails"`
 	ProcessedCount int    `json:"processed_count"`
-	SuccessCount   int    `json:"success_count"`
-	ErrorCount     int    `json:"error_count"`
+	ValidCount     int    `json:"valid_count"`
+	InvalidCount   int    `json:"invalid_count"`
+	CatchAllCount  int    `json:"catch_all_count"`
+	RiskyCount     int    `json:"risky_count"`
 	CreditsUsed    int    `json:"credits_used"`
 	CreatedAt      string `json:"created_at,omitempty"`
 }

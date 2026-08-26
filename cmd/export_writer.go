@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -18,7 +19,7 @@ func writeFlatCSV(path string, cols []exportColumn, rows []map[string]interface{
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o644)
+	return writeFileBytes(path, data)
 }
 
 // buildFlatCSV returns the flattened CSV payload (header + rows).
@@ -57,7 +58,7 @@ func writeRawJSON(path string, rows []map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, b, 0o644)
+	return writeFileBytes(path, b)
 }
 
 // --- Minimal XLSX writer (single sheet, inline strings, no dependencies) ---
@@ -100,6 +101,11 @@ var xlsxEscaper = strings.NewReplacer(
 
 // writeXLSX writes a single-sheet .xlsx with a header row and one row per result.
 func writeXLSX(path string, cols []exportColumn, rows []map[string]interface{}) error {
+	if dir := filepath.Dir(path); dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
+	}
 	f, err := os.Create(path)
 	if err != nil {
 		return err

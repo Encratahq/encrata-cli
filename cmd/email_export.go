@@ -48,12 +48,92 @@ func resolveOnlyFilters(cmd *cobra.Command) (validOnly, invalidOnly, foundOnly, 
 	return
 }
 
+// deprecateFilterFlags registers the legacy per-status boolean filters as hidden
+// aliases for --only, so old scripts keep working while help shows one flag.
+func deprecateFilterFlags(cmd *cobra.Command) {
+	cmd.Flags().Bool("valid-only", false, "Deprecated: use --only valid")
+	cmd.Flags().Bool("found-only", false, "Deprecated: use --only found")
+	cmd.Flags().Bool("breached", false, "Deprecated: use --only breached")
+	_ = cmd.Flags().MarkHidden("valid-only")
+	_ = cmd.Flags().MarkHidden("found-only")
+	_ = cmd.Flags().MarkHidden("breached")
+}
+
+// validityOnlyStatus maps --only valid|invalid to a validity results status
+// filter, returning "" for other values.
+func validityOnlyStatus(cmd *cobra.Command) string {
+	validOnly, invalidOnly, _, _ := resolveOnlyFilters(cmd)
+	switch {
+	case validOnly:
+		return "valid"
+	case invalidOnly:
+		return "invalid"
+	default:
+		return ""
+	}
+}
+
 func defaultValidityDownloadName(format string) string {
 	ext := strings.ToLower(strings.TrimSpace(format))
 	if ext == "" {
 		ext = "csv"
 	}
 	return fmt.Sprintf("email-validity-%s.%s", time.Now().Format("2006-01-02"), ext)
+}
+
+// resultsDir is the default folder CLI result files are written to when the user
+// does not pass an explicit --out.
+const resultsDir = "encrata-cli-results"
+
+// resultStem derives a safe filename stem from a source path/name: the base name
+// without directory or extension, keeping only [A-Za-z0-9._-] and collapsing any
+// other run of characters to a single '-'. Falls back to "encrata" when empty.
+func resultStem(source string) string {
+	base := filepath.Base(strings.TrimSpace(source))
+	base = strings.TrimSuffix(base, filepath.Ext(base))
+	var b strings.Builder
+	prevDash := false
+	for _, r := range base {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-' {
+			b.WriteRune(r)
+			prevDash = false
+			continue
+		}
+		if !prevDash {
+			b.WriteByte('-')
+			prevDash = true
+		}
+	}
+	stem := strings.Trim(b.String(), "-")
+	if stem == "" {
+		return "encrata"
+	}
+	return stem
+}
+
+// defaultResultPath returns encrata-cli-results/<source-stem>-result.<ext>, the
+// auto-generated output path when no --out is given, named after the uploaded
+// file (or job). format is csv|xlsx|json.
+func defaultResultPath(source, format string) string {
+	ext := strings.ToLower(strings.TrimSpace(format))
+	if ext == "" {
+		ext = "csv"
+	}
+	return filepath.Join(resultsDir, resultStem(source)+"-result."+ext)
+}
+
+// resolveResultOut returns the file to write results to: an explicit --out wins;
+// otherwise (in non-JSON mode) it auto-generates a path under resultsDir named
+// after source. JSON mode keeps STDOUT piping unless --out is set.
+func resolveResultOut(cmd *cobra.Command, source string) string {
+	if out := strings.TrimSpace(flagString(cmd, "out")); out != "" {
+		return out
+	}
+	if jsonMode() {
+		return ""
+	}
+	format, _ := resolveExportFormat(flagString(cmd, "format"), "")
+	return defaultResultPath(source, format)
 }
 
 // resolveExportFormat determines the output format from an explicit --format

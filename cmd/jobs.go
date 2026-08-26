@@ -25,8 +25,10 @@ func printJob(job *api.Job) {
 		"Status", status,
 		"Total", fmt.Sprintf("%d", job.TotalEmails),
 		"Processed", fmt.Sprintf("%d", job.ProcessedCount),
-		"Valid", fmt.Sprintf("%d", job.SuccessCount),
-		"Errors", fmt.Sprintf("%d", job.ErrorCount),
+		"Valid", fmt.Sprintf("%d", job.ValidCount),
+		"Invalid", fmt.Sprintf("%d", job.InvalidCount),
+		"Catch-all", fmt.Sprintf("%d", job.CatchAllCount),
+		"Risky", fmt.Sprintf("%d", job.RiskyCount),
 		"Credits used", fmt.Sprintf("%d", job.CreditsUsed),
 		"Created", jobCreated(job.CreatedAt),
 	)
@@ -84,16 +86,15 @@ func init() {
 	jobsResultsCmd.Flags().String("status", "", "Filter results by per-row status (e.g. valid, invalid)")
 	jobsResultsCmd.Flags().Int("page", 1, "Result page to fetch")
 	jobsResultsCmd.Flags().Int("page-size", 50, "Results per page (identity/password)")
-	jobsResultsCmd.Flags().Bool("found-only", false, "Identity: only rows with enrichment data")
-	jobsResultsCmd.Flags().Bool("breached", false, "Password: only breached rows")
+	jobsResultsCmd.Flags().String("only", "", "Keep only matching rows: valid | invalid | found | breached")
 	jobsResultsCmd.Flags().StringSlice("fields", nil, "Extra columns from the validity schema (e.g. provider,mx)")
+	deprecateFilterFlags(jobsResultsCmd)
 
 	jobsDownloadCmd.Flags().String("format", "csv", "Download format: csv, xlsx, or json (validity)")
 	jobsDownloadCmd.Flags().String("status", "", "Filter rows by status")
-	jobsDownloadCmd.Flags().Bool("valid-only", false, "Download only rows whose status is valid")
-	jobsDownloadCmd.Flags().Bool("found-only", false, "Identity: only rows with enrichment data")
-	jobsDownloadCmd.Flags().Bool("breached", false, "Password: only breached rows")
+	jobsDownloadCmd.Flags().String("only", "", "Keep only matching rows: valid | invalid | found | breached")
 	jobsDownloadCmd.Flags().String("out", "", "Write to a file instead of stdout")
+	deprecateFilterFlags(jobsDownloadCmd)
 
 	jobsCmd.AddCommand(
 		jobsCreateCmd,

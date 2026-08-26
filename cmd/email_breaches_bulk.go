@@ -28,7 +28,7 @@ func runBreachesBulk(cmd *cobra.Command, path string) error {
 	if err != nil {
 		return err
 	}
-	out, _ := cmd.Flags().GetString("out")
+	out := resolveResultOut(cmd, fileName)
 
 	total := len(emails)
 	asJSON := jsonMode()
