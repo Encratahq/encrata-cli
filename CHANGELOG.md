@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-09-02
+
+### Changed
+- Migrated all CLI API calls to the restructured nested `/api/cli/*` route tree.
+  Email verbs now target `/api/cli/email/*` (`email/validity`, `email/identity`,
+  `email/breaches`, `email/validity/bulk`, `email/bulk-validity-search`,
+  `email/bulk-breaches-search`), password breach lookups target
+  `/api/cli/email/password/breaches[/bulk]`, and every async job/export route
+  moved under `/api/cli/jobs/*` (`jobs/validity`, `jobs/identity`,
+  `jobs/password`, `jobs/bulk`, `jobs/exports`, plus their
+  `results`/`download`/`cancel`/`retry` sub-paths). No user-facing command or
+  flag changes - the surface is identical, only the backend endpoints moved.
+
 ## [0.12.0] - 2026-08-26
 
 ### Removed
@@ -115,7 +128,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The connected-account spreadsheet route is `/api/workflows/integrations/{id}/sheet`
   (not `/create-sheet`) and returns `{spreadsheet_id, spreadsheet_url, sheet_name}`.
 
-[Unreleased]: https://github.com/Encratahq/encrata-cli/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/Encratahq/encrata-cli/compare/v0.12.1...HEAD
+[0.12.1]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.12.1
 [0.12.0]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.12.0
 [0.11.2]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.11.2
 [0.11.1]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.11.1

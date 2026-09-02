@@ -33,35 +33,35 @@ type CreateJobRequest struct {
 }
 
 // CreateValidityJob creates an async validity job from a list of emails.
-// POST /api/cli/validity-jobs
+// POST /api/cli/jobs/validity
 func (c *Client) CreateValidityJob(ctx context.Context, req *CreateJobRequest) (json.RawMessage, error) {
-	return c.post(ctx, "/api/cli/validity-jobs", req)
+	return c.post(ctx, "/api/cli/jobs/validity", req)
 }
 
 // CreateValidityJobFile creates an async validity job from an uploaded file
 // (multipart, up to 50MB).
-// POST /api/cli/validity-jobs
+// POST /api/cli/jobs/validity
 func (c *Client) CreateValidityJobFile(ctx context.Context, fileName string, data []byte) (json.RawMessage, error) {
-	return c.postMultipart(ctx, "/api/cli/validity-jobs", "file", fileName, data, nil)
+	return c.postMultipart(ctx, "/api/cli/jobs/validity", "file", fileName, data, nil)
 }
 
 // GetValidityJob fetches a single job by id.
-// GET /api/cli/validity-jobs?id=
+// GET /api/cli/jobs/validity?id=
 func (c *Client) GetValidityJob(ctx context.Context, id string) (json.RawMessage, error) {
 	q := url.Values{}
 	q.Set("id", id)
-	return c.get(ctx, "/api/cli/validity-jobs", q)
+	return c.get(ctx, "/api/cli/jobs/validity", q)
 }
 
 // ListValidityJobs lists all jobs.
-// GET /api/cli/validity-jobs
+// GET /api/cli/jobs/validity
 func (c *Client) ListValidityJobs(ctx context.Context) (json.RawMessage, error) {
-	return c.get(ctx, "/api/cli/validity-jobs", nil)
+	return c.get(ctx, "/api/cli/jobs/validity", nil)
 }
 
 // GetValidityJobResults returns a page of job results, optionally filtered by
 // per-row status.
-// GET /api/cli/validity-jobs/results?id=&page=&status=
+// GET /api/cli/jobs/validity/results?id=&page=&status=
 func (c *Client) GetValidityJobResults(ctx context.Context, id string, page int, status string) (json.RawMessage, error) {
 	q := url.Values{}
 	q.Set("id", id)
@@ -71,11 +71,11 @@ func (c *Client) GetValidityJobResults(ctx context.Context, id string, page int,
 	if status != "" {
 		q.Set("status", status)
 	}
-	return c.get(ctx, "/api/cli/validity-jobs/results", q)
+	return c.get(ctx, "/api/cli/jobs/validity/results", q)
 }
 
 // DownloadValidityJob downloads job results as raw CSV or JSON bytes.
-// GET /api/cli/validity-jobs/download?id=&status=&format=
+// GET /api/cli/jobs/validity/download?id=&status=&format=
 func (c *Client) DownloadValidityJob(ctx context.Context, id, status, format string) ([]byte, error) {
 	q := url.Values{}
 	q.Set("id", id)
@@ -85,15 +85,15 @@ func (c *Client) DownloadValidityJob(ctx context.Context, id, status, format str
 	if format != "" {
 		q.Set("format", format)
 	}
-	return c.getBytes(ctx, "/api/cli/validity-jobs/download", q)
+	return c.getBytes(ctx, "/api/cli/jobs/validity/download", q)
 }
 
 // CancelValidityJob cancels a running job.
-// POST /api/cli/validity-jobs/cancel?id=
+// POST /api/cli/jobs/validity/cancel?id=
 func (c *Client) CancelValidityJob(ctx context.Context, id string) (json.RawMessage, error) {
 	q := url.Values{}
 	q.Set("id", id)
-	return c.postQuery(ctx, "/api/cli/validity-jobs/cancel", q, nil)
+	return c.postQuery(ctx, "/api/cli/jobs/validity/cancel", q, nil)
 }
 
 // ParseJob decodes a job from an API response, whether it is bare or nested

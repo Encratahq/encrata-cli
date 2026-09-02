@@ -242,7 +242,7 @@ encrata update
 | `email breaches` | Data-breach exposure for an address | 1/email |
 | `email bulk` | Validate a whole file/list (= `email validity --bulk`) | 1/email |
 
-API endpoint family: these commands now target `/api/cli/*` paths (`/api/cli/email-validity`, `/api/cli/email-identity`, `/api/cli/breaches`, `/api/cli/email-validity-bulk`) rather than legacy `/api/agent/*` aliases.
+API endpoint family: these commands now target `/api/cli/email/*` paths (`/api/cli/email/validity`, `/api/cli/email/identity`, `/api/cli/email/breaches`, `/api/cli/email/validity/bulk`) rather than legacy `/api/agent/*` aliases.
 
 Every verb runs on one address, or on a file/STDIN list with `--bulk`.
 
@@ -349,8 +349,8 @@ k-anonymity). Your password is hashed locally with SHA-1 and **only the hash is
 sent** — the plaintext never leaves your machine and is never logged, cached, or
 stored.
 
-API endpoint family: these commands target `/api/cli/password-breaches` and
-`/api/cli/password-breaches/bulk`.
+API endpoint family: these commands target `/api/cli/email/password/breaches` and
+`/api/cli/email/password/breaches/bulk`.
 
 ```bash
 # Prompt interactively (no echo — never lands in shell history)

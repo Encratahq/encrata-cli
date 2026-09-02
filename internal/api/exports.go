@@ -9,7 +9,7 @@ import (
 	"net/url"
 )
 
-// ExportState is the async cached-export status returned by /api/cli/exports*.
+// ExportState is the async cached-export status returned by /api/cli/jobs/exports*.
 // Status is one of: none, building, ready, failed.
 type ExportState struct {
 	Status   string `json:"status"`
@@ -32,12 +32,12 @@ func exportQuery(kind, id, format, filter string) url.Values {
 
 // CreateExport enqueues (or reuses) a cached export build for a completed job.
 // A ready variant returns its presigned URL immediately; otherwise the server
-// starts building and returns status "building". POST /api/cli/exports
+// starts building and returns status "building". POST /api/cli/jobs/exports
 func (c *Client) CreateExport(ctx context.Context, kind, id, format, filter string) (*ExportState, error) {
 	if filter == "" {
 		filter = "all"
 	}
-	data, err := c.post(ctx, "/api/cli/exports", map[string]string{
+	data, err := c.post(ctx, "/api/cli/jobs/exports", map[string]string{
 		"kind": kind, "id": id, "format": format, "filter": filter,
 	})
 	if err != nil {
@@ -46,9 +46,9 @@ func (c *Client) CreateExport(ctx context.Context, kind, id, format, filter stri
 	return decodeExportState(data)
 }
 
-// ExportStatus polls a variant's build state. GET /api/cli/exports/status
+// ExportStatus polls a variant's build state. GET /api/cli/jobs/exports/status
 func (c *Client) ExportStatus(ctx context.Context, kind, id, format, filter string) (*ExportState, error) {
-	data, err := c.get(ctx, "/api/cli/exports/status", exportQuery(kind, id, format, filter))
+	data, err := c.get(ctx, "/api/cli/jobs/exports/status", exportQuery(kind, id, format, filter))
 	if err != nil {
 		return nil, err
 	}
@@ -57,11 +57,11 @@ func (c *Client) ExportStatus(ctx context.Context, kind, id, format, filter stri
 
 // ExportDownloadURL resolves a fresh presigned attachment URL for a ready
 // variant, transparently rebuilding if the object aged out (status "building").
-// GET /api/cli/exports/download?json=1
+// GET /api/cli/jobs/exports/download?json=1
 func (c *Client) ExportDownloadURL(ctx context.Context, kind, id, format, filter string) (*ExportState, error) {
 	q := exportQuery(kind, id, format, filter)
 	q.Set("json", "1")
-	data, err := c.get(ctx, "/api/cli/exports/download", q)
+	data, err := c.get(ctx, "/api/cli/jobs/exports/download", q)
 	if err != nil {
 		return nil, err
 	}
