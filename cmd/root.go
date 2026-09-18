@@ -113,6 +113,7 @@ func init() {
 	rootCmd.AddCommand(webhooksCmd)
 	rootCmd.AddCommand(workspaceCmd)
 	rootCmd.AddCommand(workflowsCmd)
+	rootCmd.AddCommand(breachesCmd)
 	improveArgErrors(rootCmd)
 }
 
