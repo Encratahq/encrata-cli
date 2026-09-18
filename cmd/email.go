@@ -32,6 +32,7 @@ func init() {
 		emailValidityCmd,
 		emailIdentityCmd,
 		emailBreachesCmd,
+		emailComplianceCmd,
 		emailBulkCmd,
 	)
 

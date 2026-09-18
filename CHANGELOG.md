@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-09-18
+
+### Added
+- `email compliance <email>` - resolve whether you may cold-email an address and
+  under whose law, returning the governing jurisdiction, its rule, main laws and
+  restrictions, and attribution confidence. Targets `/api/cli/email/compliance`.
+- `breaches github scan <repo>` and `breaches github get <scan-id>` - scan a
+  GitHub repository for committed secrets and fetch a prior scan by ID. `--deep`
+  walks the full commit history in the background; `--ref`, `--min-severity`,
+  `--fail-on-finding` and `--out` are supported. Targets
+  `/api/cli/breaches/github[/{id}]`.
+
 ## [0.12.1] - 2026-09-02
 
 ### Changed

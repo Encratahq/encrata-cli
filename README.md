@@ -240,9 +240,10 @@ encrata update
 | `email validity` | Deliverability verdict (valid/invalid/catch-all/risky) **+ full report** | 1/email |
 | `email identity` | The **person** — name, role, company, socials, breaches | 1000/email |
 | `email breaches` | Data-breach exposure for an address | 1/email |
+| `email compliance` | Whether you may cold-email an address, and under whose law | 1/email |
 | `email bulk` | Validate a whole file/list (= `email validity --bulk`) | 1/email |
 
-API endpoint family: these commands now target `/api/cli/email/*` paths (`/api/cli/email/validity`, `/api/cli/email/identity`, `/api/cli/email/breaches`, `/api/cli/email/validity/bulk`) rather than legacy `/api/agent/*` aliases.
+API endpoint family: these commands now target `/api/cli/email/*` paths (`/api/cli/email/validity`, `/api/cli/email/identity`, `/api/cli/email/breaches`, `/api/cli/email/compliance`, `/api/cli/email/validity/bulk`) rather than legacy `/api/agent/*` aliases.
 
 Every verb runs on one address, or on a file/STDIN list with `--bulk`.
 
@@ -342,6 +343,29 @@ Exit codes (usable as a CI / sign-up guard, mirroring `encrata password`):
 
 ---
 
+### `encrata email compliance`
+
+Answer whether you may cold-email an address, and under whose law. Returns the
+governing jurisdiction, its rule, the main laws and restrictions, and how much to
+trust the attribution (`confident` / `medium` / `unknown`).
+
+The verdict can arrive in two phases: some signals resolve inside the request and
+one may finish afterwards. The printed message reflects whether the answer is
+provisional, confident, or unknown, so render it as shown.
+
+```bash
+encrata email compliance jane@acme.com
+encrata email compliance jane@acme.com --json
+encrata email compliance jane@acme.com --out compliance.json
+```
+
+| Flag | Description |
+| ---- | ----------- |
+| `--out` | Write the full JSON result to a file |
+| `--json` | Print raw JSON output |
+
+---
+
 ### `encrata password`
 
 Check whether a password has appeared in known data breaches (HIBP
@@ -390,6 +414,45 @@ Exit codes (usable as a CI / sign-up guard):
 | `2` | A breach was found (only with `--fail-on-finding`) |
 | `3` | Authentication failed |
 | `4` | Insufficient credits |
+
+---
+
+
+### `encrata breaches github`
+
+Scan a GitHub repository for committed secrets and credentials. `scan` starts a
+scan; `get` fetches a previous scan's result by its ID.
+
+By default only the current checkout is scanned and the result comes back inline.
+Use `--deep` to walk the full commit history: a deep scan runs in the background
+and returns a scan ID whose result you fetch later with `breaches github get`.
+
+```bash
+# Scan the current checkout inline
+encrata breaches github scan https://github.com/org/repo
+
+# Deep (full-history) scan runs in the background, returns a scan ID
+encrata breaches github scan https://github.com/org/repo --deep
+
+# Target a branch/tag/commit and filter by severity
+encrata breaches github scan https://github.com/org/repo --ref main --min-severity high
+
+# Fetch a background scan's result later
+encrata breaches github get scn_abc123
+```
+
+| Flag | Description |
+| ---- | ----------- |
+| `--deep` | Scan the full commit history (runs in the background) |
+| `--ref` | Branch, tag, or commit to scan |
+| `--min-severity` | Only report findings at or above `low`, `medium`, `high`, or `critical` |
+| `--fail-on-finding` | Exit with code 2 if any secret is found |
+| `--out` | Write the full JSON result to a file |
+| `--json` | Print raw JSON output |
+
+Exit codes mirror `encrata password` and `email breaches`: `0` success (or a
+finding without `--fail-on-finding`), `1` operational error, `2` a secret was
+found (with `--fail-on-finding`), `3` auth, `4` credits.
 
 ---
 

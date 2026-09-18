@@ -20,6 +20,7 @@ type EmailAPI interface {
 	EmailValidity(ctx context.Context, email string) (json.RawMessage, error)
 	EmailIdentity(ctx context.Context, email string) (json.RawMessage, error)
 	EmailBreaches(ctx context.Context, email string) (json.RawMessage, error)
+	EmailCompliance(ctx context.Context, email string) (json.RawMessage, error)
 	EmailValidityBulk(ctx context.Context, emails []string) (json.RawMessage, error)
 }
 
@@ -160,6 +161,12 @@ type BulkSearchAPI interface {
 	BulkBreachesSearch(ctx context.Context, queries []string, fileName string, onEvent func(BulkEvent) error) error
 }
 
+// BreachesAPI exposes source-code / repository secret scanning.
+type BreachesAPI interface {
+	ScanGitHubRepo(ctx context.Context, req GitHubScanRequest) (json.RawMessage, error)
+	GetGitHubScan(ctx context.Context, id string) (json.RawMessage, error)
+}
+
 // API aggregates every segregated interface; *Client is the sole implementation.
 type API interface {
 	AccountAPI
@@ -173,6 +180,7 @@ type API interface {
 	IntegrationsAPI
 	WorkspaceAPI
 	BulkSearchAPI
+	BreachesAPI
 	ExportsAPI
 }
 
