@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -66,7 +67,17 @@ func (c *Client) stream(ctx context.Context, path string, payload interface{}, o
 			return err
 		}
 	}
-	return scanner.Err()
+	if err := scanner.Err(); err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if errors.Is(err, bufio.ErrTooLong) {
+			return err
+		}
+		// Headers arrived, so any read failure now means the body was cut off.
+		return &StreamCutError{Err: err}
+	}
+	return nil
 }
 
 // postWithHeaders issues a POST with extra request headers (e.g. Idempotency-Key)

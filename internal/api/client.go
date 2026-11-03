@@ -34,14 +34,20 @@ type Client struct {
 	UserAgent    string
 	HTTPClient   *http.Client
 	streamClient *http.Client
+	// subscribeClient holds the long-lived completion stream open, so it has no
+	// overall timeout; Subscribe detects a dead connection by missed pings.
+	subscribeClient *http.Client
 }
 
 func New(baseURL, apiKey string) *Client {
+	subscribeTransport := http.DefaultTransport.(*http.Transport).Clone()
+	subscribeTransport.ResponseHeaderTimeout = 30 * time.Second
 	return &Client{
-		BaseURL:      strings.TrimRight(baseURL, "/"),
-		APIKey:       apiKey,
-		UserAgent:    "encrata-cli/" + Version,
-		HTTPClient:   &http.Client{Timeout: RequestTimeout},
-		streamClient: &http.Client{Timeout: streamTimeout},
+		BaseURL:         strings.TrimRight(baseURL, "/"),
+		APIKey:          apiKey,
+		UserAgent:       "encrata-cli/" + Version,
+		HTTPClient:      &http.Client{Timeout: RequestTimeout},
+		streamClient:    &http.Client{Timeout: streamTimeout},
+		subscribeClient: &http.Client{Transport: subscribeTransport},
 	}
 }

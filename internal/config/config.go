@@ -10,14 +10,30 @@ import (
 
 const (
 	DefaultBaseURL = "https://cli.encrata.com"
+	DefaultAppURL  = "https://app.encrata.com"
 	EnvAPIKey      = "ENCRATA_API_KEY"
 	EnvBaseURL     = "ENCRATA_BASE_URL"
+	EnvAppURL      = "ENCRATA_APP_URL"
 )
+
+// NotifyEvents are the job outcomes a desktop notification can be sent for.
+var NotifyEvents = []string{"completed", "failed", "cancelled"}
 
 type Config struct {
 	APIKey  string `mapstructure:"api_key"`
 	BaseURL string `mapstructure:"base_url"`
-	Output  string `mapstructure:"output"`
+	// AppURL is the dashboard that notification "View results" links open.
+	AppURL string `mapstructure:"app_url"`
+	Output string `mapstructure:"output"`
+	// Notifications are local, per-machine desktop notification preferences.
+	// They are off until the user opts in; nothing is stored server-side.
+	Notifications NotifyPrefs `mapstructure:"notifications"`
+}
+
+// NotifyPrefs controls desktop notifications for finished bulk jobs.
+type NotifyPrefs struct {
+	Enabled bool     `mapstructure:"enabled"`
+	On      []string `mapstructure:"on"` // subset of NotifyEvents
 }
 
 func Load() *Config {
@@ -29,7 +45,10 @@ func Load() *Config {
 	viper.AddConfigPath(".")
 
 	viper.SetDefault("base_url", DefaultBaseURL)
+	viper.SetDefault("app_url", DefaultAppURL)
 	viper.SetDefault("output", "table")
+	viper.SetDefault("notifications.enabled", false)
+	viper.SetDefault("notifications.on", NotifyEvents)
 
 	viper.SetEnvPrefix("ENCRATA")
 	viper.AutomaticEnv()
@@ -39,7 +58,12 @@ func Load() *Config {
 	cfg := &Config{
 		APIKey:  viper.GetString("api_key"),
 		BaseURL: viper.GetString("base_url"),
+		AppURL:  viper.GetString("app_url"),
 		Output:  viper.GetString("output"),
+		Notifications: NotifyPrefs{
+			Enabled: viper.GetBool("notifications.enabled"),
+			On:      viper.GetStringSlice("notifications.on"),
+		},
 	}
 
 	// Env vars override config file
@@ -48,6 +72,9 @@ func Load() *Config {
 	}
 	if url := os.Getenv(EnvBaseURL); url != "" {
 		cfg.BaseURL = url
+	}
+	if url := os.Getenv(EnvAppURL); url != "" {
+		cfg.AppURL = url
 	}
 
 	return cfg
@@ -67,6 +94,8 @@ func Save(cfg *Config) error {
 	viper.Set("api_key", cfg.APIKey)
 	viper.Set("base_url", cfg.BaseURL)
 	viper.Set("output", cfg.Output)
+	viper.Set("notifications.enabled", cfg.Notifications.Enabled)
+	viper.Set("notifications.on", cfg.Notifications.On)
 
 	configPath := filepath.Join(configDir, "config.yaml")
 	if err := viper.WriteConfigAs(configPath); err != nil {

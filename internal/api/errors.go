@@ -20,6 +20,16 @@ func (e *Error) Error() string {
 	return fmt.Sprintf("request failed with status %d", e.StatusCode)
 }
 
+// StreamCutError reports that a streaming (SSE) response was cut off mid-body:
+// an HTTP/2 stream reset from a proxy, an unexpected EOF, or the client timeout
+// firing while reading. Events delivered before the cut are still valid.
+type StreamCutError struct {
+	Err error
+}
+
+func (e *StreamCutError) Error() string { return "stream interrupted: " + e.Err.Error() }
+func (e *StreamCutError) Unwrap() error { return e.Err }
+
 func parseError(status int, data []byte) error {
 	var body struct {
 		Error   interface{} `json:"error"`

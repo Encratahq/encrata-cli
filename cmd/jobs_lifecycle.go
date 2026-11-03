@@ -11,7 +11,7 @@ import (
 
 var jobsCancelCmd = &cobra.Command{
 	Use:   "cancel [job-id]",
-	Short: "Cancel a running job (use --type for identity or password)",
+	Short: "Cancel a running job (use --type for identity, password, or breaches)",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		jt, err := jobType(cmd)
@@ -43,7 +43,7 @@ var jobsCancelCmd = &cobra.Command{
 
 var jobsRetryCmd = &cobra.Command{
 	Use:   "retry [job-id]",
-	Short: "Retry dead-lettered chunks of a job (validity or identity)",
+	Short: "Retry dead-lettered chunks of a job (validity, identity, or breaches)",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		jt, err := jobType(cmd)

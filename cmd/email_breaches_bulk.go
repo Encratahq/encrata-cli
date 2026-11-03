@@ -7,18 +7,37 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Encratahq/cli/internal/api"
 	"github.com/Encratahq/cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
-// runBreachesBulk streams breach checks for a file/STDIN list of emails, prints
-// a summary table, optionally exports, and returns errBreachDetected (non-zero
-// exit) when any address is found in a breach.
+// breachesStreamThreshold is the row count above which bulk breach checks switch
+// from live streaming (SSE) to an async job automatically. It is far below
+// validity's 1000 because breach lookups run at only ~2-4 emails/s, and the
+// server cuts any single stream at 120s (Envoy route timeout + cli proxy), so a
+// stream must comfortably finish inside that window.
+const breachesStreamThreshold = 200
+
+// breachesUseJob decides whether a bulk breach check runs as an async job.
+func breachesUseJob(count int, forceJob, forceStream bool) bool {
+	return forceJob || (!forceStream && count > breachesStreamThreshold)
+}
+
+// runBreachesBulk checks a file/STDIN list of emails for breaches, live over a
+// stream for small lists or as an async job for large ones (or --job), prints a
+// summary, exports, and returns errBreachDetected (non-zero exit) when any
+// address is breached and --fail-on-finding is set.
 func runBreachesBulk(cmd *cobra.Command, path string) error {
 	if err := validateOnly(cmd, "breached"); err != nil {
 		return err
+	}
+	forceStream, _ := cmd.Flags().GetBool("stream")
+	forceJob, _ := cmd.Flags().GetBool("job")
+	if forceStream && forceJob {
+		return friendlyFormatError(cmd, "choose either --stream or --job, not both")
 	}
 	fileName, emails, _, err := loadEmails(cmd, path)
 	if err != nil {
@@ -30,6 +49,18 @@ func runBreachesBulk(cmd *cobra.Command, path string) error {
 	}
 	out := resolveResultOut(cmd, fileName)
 
+	if breachesUseJob(len(emails), forceJob, forceStream) {
+		if !forceJob && !jsonMode() {
+			output.Dim.Printf("  %d emails exceeds %d, running as an async job (use --stream to force live).\n", len(emails), breachesStreamThreshold)
+		}
+		return runBreachesJob(cmd, client, fileName, emails, out)
+	}
+	return runBreachesStream(cmd, client, path, fileName, emails, out)
+}
+
+// runBreachesStream checks emails over one live SSE stream. If the stream is
+// cut, the rows that already arrived are still saved.
+func runBreachesStream(cmd *cobra.Command, client api.API, path, fileName string, emails []string, out string) error {
 	total := len(emails)
 	asJSON := jsonMode()
 	if !asJSON {
@@ -39,6 +70,7 @@ func runBreachesBulk(cmd *cobra.Command, path string) error {
 	var results []map[string]interface{}
 	var rawResults []json.RawMessage
 	done := 0
+	start := time.Now()
 	streamErr := client.BulkBreachesSearch(cmd.Context(), emails, fileName, func(ev api.BulkEvent) error {
 		switch ev.Type {
 		case "result":
@@ -67,36 +99,40 @@ func runBreachesBulk(cmd *cobra.Command, path string) error {
 		fmt.Println()
 	}
 	if streamErr != nil {
-		output.Error(streamErr.Error())
-		return streamErr
+		return handleStreamFailure(streamFailure{
+			err:     streamErr,
+			elapsed: time.Since(start),
+			done:    done,
+			total:   total,
+			retry:   asyncRetryHint(cmd, path, "--bulk", "--job"),
+		}, out, rawResults, func(out string) error { return exportBreaches(cmd, out, results) })
 	}
 
-	breached := countBreachedRows(results)
+	return finishBreaches(cmd, out, results, rawResultsArray(rawResults),
+		total, countBreachedRows(results), sumCredits(results))
+}
 
-	if asJSON {
-		output.JSON(rawResultsArray(rawResults))
+// finishBreaches prints the summary (or the JSON rows), writes the result file,
+// and applies --fail-on-finding. Shared by the stream and job paths.
+func finishBreaches(cmd *cobra.Command, out string, results []map[string]interface{}, jsonRows json.RawMessage, checked, breached, credits int) error {
+	if jsonMode() {
+		output.JSON(jsonRows)
 		if out != "" {
 			if err := exportBreaches(cmd, out, results); err != nil {
 				return err
 			}
 		}
-		if breached > 0 && failOnFinding(cmd) {
-			return errBreachDetected
+	} else {
+		fmt.Println()
+		fmt.Printf("  Checked %d · Breached %s · Clean %s · Credits %d\n",
+			checked,
+			output.Err.Sprintf("%d", breached),
+			output.Success.Sprintf("%d", checked-breached),
+			credits,
+		)
+		if err := exportBreaches(cmd, out, results); err != nil {
+			return err
 		}
-		return nil
-	}
-
-	fmt.Println()
-	clean := total - breached
-	fmt.Printf("  Checked %d · Breached %s · Clean %s · Credits %d\n",
-		total,
-		output.Err.Sprintf("%d", breached),
-		output.Success.Sprintf("%d", clean),
-		sumCredits(results),
-	)
-
-	if err := exportBreaches(cmd, out, results); err != nil {
-		return err
 	}
 	if breached > 0 && failOnFinding(cmd) {
 		return errBreachDetected

@@ -9,7 +9,7 @@ import (
 // TestJobStrategiesComplete verifies every non-validity job type declares a
 // complete strategy, so adding a type stays a one-entry change (Open/Closed).
 func TestJobStrategiesComplete(t *testing.T) {
-	for _, jt := range []string{"identity", "password"} {
+	for _, jt := range []string{"identity", "password", "breaches"} {
 		s := strategyFor(jt)
 		if s.title == "" {
 			t.Errorf("%s: missing title", jt)
@@ -32,6 +32,9 @@ func TestJobStrategiesComplete(t *testing.T) {
 	if strategyFor("identity").retry == nil {
 		t.Error("identity jobs must support retry")
 	}
+	if strategyFor("breaches").retry == nil {
+		t.Error("breaches jobs must support retry")
+	}
 }
 
 // TestJobType validates the --type flag parsing on the unified jobs surface.
@@ -45,6 +48,7 @@ func TestJobType(t *testing.T) {
 		{"validity", "validity", false},
 		{"identity", "identity", false},
 		{"password", "password", false},
+		{"breaches", "breaches", false},
 		{"bogus", "", true},
 	}
 	for _, c := range cases {

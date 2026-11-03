@@ -124,8 +124,8 @@ when output is not a terminal.
 | Code | Meaning |
 | ---- | ------- |
 | `0` | Success (or a finding when `--fail-on-finding` is not set) |
-| `1` | Operational error (bad usage, network, or server) |
-| `2` | A finding was detected — breach/leak — only with `--fail-on-finding` |
+| `1` | Operational error (bad usage, network, or server); `jobs watch --job` also exits 1 when the job failed or was cancelled |
+| `2` | A finding was detected — breach/leak, or a suspicious/malicious malware verdict — only with `--fail-on-finding` |
 | `3` | Authentication failed |
 | `4` | Insufficient credits |
 
@@ -166,6 +166,27 @@ encrata config unset api-key     # remove the saved key
 encrata config unset base-url    # revert to the default API URL
 encrata config unset output      # revert to table output
 ```
+
+### `encrata config notifications`
+
+Show a desktop notification when a bulk job you are waiting on finishes, with a
+**View results** button that opens the job on the dashboard (on macOS/Linux the
+link is in the notification text). **Off by default**, and stored on this
+machine only (`~/.encrata/config.yaml`), not on your account.
+
+```bash
+encrata config notifications on                      # completed, failed and cancelled
+encrata config notifications on --on completed,failed
+encrata config notifications test                    # send a sample notification
+encrata config notifications off
+encrata config notifications                         # show the current setting
+```
+
+Only finished jobs notify, never progress. A job you waited on for under 30s in
+the foreground does not notify (you are looking at the terminal), and several
+jobs finishing together while following `jobs watch` are grouped into one
+notification. Override per run with `--notify` (always notify, even for a quick
+job) or `--no-notify`, on `email breaches --bulk` and `jobs watch`.
 
 ### Global options
 
@@ -297,8 +318,21 @@ very large lists, prefer the async `jobs --type identity` surface.
 ### `encrata email breaches`
 
 Check whether an email appears in known data breaches. Pass a single email to
-check it, or use `--bulk` with a CSV/text file (or `-` for STDIN) to stream a
+check it, or use `--bulk` with a CSV/text file (or `-` for STDIN) to check a
 whole list with a live progress bar.
+
+Lists of up to **200** emails stream live. Larger lists switch automatically to
+an **async job** (breach lookups run at ~2–4 emails/s, so a long list cannot
+finish inside a single streaming request): the CLI creates the job, shows
+progress while it runs, then downloads the rows and writes the same result
+file and summary as a live run. `--job` forces a job for any size and
+`--stream` forces live streaming. Press Ctrl+C while waiting to stop watching —
+the job keeps running and the CLI prints its ID so you can collect it later
+with `encrata jobs status|download <id> --type breaches`.
+
+If a forced `--stream` run is cut off mid-way, the rows that already arrived
+are still saved to the result file (marked partial) and the CLI suggests
+re-running with `--job`.
 
 ```bash
 # Single email
@@ -313,6 +347,10 @@ cat emails.csv | encrata email breaches - --bulk
 encrata email breaches emails.csv --bulk --out breaches.csv
 encrata email breaches emails.csv --bulk --out breaches.xlsx
 encrata email breaches emails.csv --bulk --format json
+
+# Large lists (>200 run as a job automatically; --job forces it)
+encrata email breaches big-list.csv --bulk
+encrata email breaches emails.csv --bulk --job
 ```
 
 Options:
@@ -320,7 +358,10 @@ Options:
 | Flag | Description |
 | ---- | ----------- |
 | `--full` | Show exposed data and registered services (single-email mode) |
-| `--bulk` | Check a file (or `-` for STDIN) of emails via streaming |
+| `--bulk` | Check a file (or `-` for STDIN) of emails (streams up to 200, async job above) |
+| `--job` | Run a `--bulk` check as an async job and wait for it (any size) |
+| `--stream` | Force live streaming for a `--bulk` check (not with `--job`) |
+| `--notify` / `--no-notify` | Desktop notification when the job finishes (overrides `config notifications`) |
 | `--out` | Write bulk results to a file (`.csv`, `.xlsx`, or `.json`) |
 | `--format` | Bulk export format: `csv`, `xlsx`, or `json` (default: inferred from `--out`) |
 | `--only` | Export only matching rows: `breached` |
@@ -336,8 +377,9 @@ Exit codes (usable as a CI / sign-up guard, mirroring `encrata password`):
 | Code | Meaning |
 | ---- | ------- |
 | `0` | Success — or a breach was found but `--fail-on-finding` was not set |
-| `1` | Operational error (network, validation, or server) |
+| `1` | Operational error (network, validation, or server), a cut stream, or Ctrl+C while waiting on a job |
 | `2` | A breach was found (only with `--fail-on-finding`) |
+| `4` | Insufficient credits (the server's message is shown with how to top up) |
 | `3` | Authentication failed |
 | `4` | Insufficient credits |
 
@@ -457,6 +499,55 @@ found (with `--fail-on-finding`), `3` auth, `4` credits.
 ---
 
 
+### `encrata malware`
+
+Scan one item for malware, phishing and other threats. Each scan is a single,
+synchronous lookup that returns a verdict (`clean`, `suspicious`, `malicious` or
+`unknown`), a 0–100 risk score, the signals behind it, and any indicators of
+compromise (IOCs).
+
+```bash
+# A URL: redirects, final domain, TLS, hosting, page and threat-intel checks
+encrata malware url https://example.com/login
+
+# A file, uploaded inline (up to 10MB)
+encrata malware file ./invoice.pdf
+
+# A larger file (up to 100MB), fetched by the server from a download link
+encrata malware file --source-url https://files.example.com/big.zip
+
+# An image: URLs hidden in the picture (OCR), appended data, steganography
+encrata malware image ./screenshot.png
+
+# Decode QR / 2D codes in an image and scan where they point
+encrata malware qr ./poster-qr.jpg
+
+# Decode 1D barcodes in an image and scan their payloads (alias: bar)
+encrata malware barcode ./label.png
+
+# CI gate: exit 2 on a suspicious or malicious verdict
+encrata malware url https://example.com --fail-on-finding
+
+# Full result, with a STIX 2.1 bundle of the findings
+encrata malware url https://example.com --stix --json > scan.json
+```
+
+| Flag | Description |
+| ---- | ----------- |
+| `--source-url` | `file` only: scan a large file by download URL instead of a path (up to 100MB) |
+| `--stix` | Include a STIX 2.1 bundle of the findings in the result |
+| `--fail-on-finding` | Exit with code 2 if the verdict is `suspicious` or `malicious` |
+| `--out` | Write the full JSON result to a file |
+| `--json` | Print raw JSON output |
+
+The table view shows the verdict, score and key details, the signals that raised
+something (informational passes are left to `--json`), decoded codes for `qr` /
+`barcode`, and IOCs, each capped at 10 rows. Uploads over 10MB are refused
+locally before anything is sent. Targets `POST /api/cli/malware/scan`.
+
+---
+
+
 ### `encrata email bulk`
 
 Validate a batch of emails from a CSV/text file or STDIN. Small batches stream
@@ -524,8 +615,8 @@ writes the raw, nested result objects (unflattened) instead of a flat table.
 ### `encrata jobs`
 
 Manage asynchronous jobs for large inputs the backend processes in the
-background. **One namespace, three job types** selected with `--type`
-(`validity` is the default; also `identity` and `password`).
+background. **One namespace, four job types** selected with `--type`
+(`validity` is the default; also `identity`, `password`, and `breaches`).
 
 ```bash
 # Validity (default) — from a file or STDIN
@@ -546,16 +637,49 @@ encrata jobs download JOB_ID --type identity --out people.csv
 encrata jobs create --type password --sha1-file hashes.txt
 encrata jobs create --type password --password-file passwords.txt   # hashed locally
 encrata jobs results JOB_ID --type password --breached
+
+# Breaches — bulk email breach checks (also what `email breaches --bulk` uses
+# for lists over 200)
+encrata jobs create emails.csv --type breaches
+encrata jobs results JOB_ID --type breaches --only breached
+encrata jobs download JOB_ID --type breaches --out breaches.csv
 ```
 
 Every verb (`create`, `list`, `status`, `results`, `download`, `cancel`,
-`retry`) accepts `--type validity|identity|password`.
+`retry`) accepts `--type validity|identity|password|breaches`.
+
+#### `encrata jobs watch`
+
+Wait for bulk jobs to finish **live**, without polling: the CLI holds one
+connection open and the server pushes a message the moment a job completes,
+fails or is cancelled (progress is never pushed).
+
+```bash
+# Follow every bulk job you own until Ctrl+C
+encrata jobs watch
+
+# Wait for one job, then exit: 0 = completed, 1 = failed or cancelled
+encrata jobs watch --job JOB_ID && encrata jobs download JOB_ID --type breaches
+
+# Also check the job's status, so a job that already finished is caught
+encrata jobs watch --job JOB_ID --type breaches --notify
+
+# One JSON object per finished job
+encrata jobs watch --json
+```
+
+The stream reconnects on its own if the connection drops. It covers every job
+you own, including jobs run in other workspaces, so each line shows the job ID
+and kind. `email breaches --bulk` uses the same stream when it runs as a job:
+the wait ends as soon as the server announces the job finished (the status poll
+stays as the progress bar and fallback). See
+[`config notifications`](#encrata-config-notifications) for desktop alerts.
 
 Options:
 
 | Command | Flag | Description |
 | ------- | ---- | ----------- |
-| all | `--type` | Job type: `validity` (default), `identity`, `password` |
+| all | `--type` | Job type: `validity` (default), `identity`, `password`, `breaches` |
 | `create` (password) | `--sha1s` / `--sha1-file` / `--password-file` | Hash sources (plaintext hashed locally, never sent) |
 | `create` | `--file-name` | Optional display name |
 | `results` | `--status` | Validity: filter by per-row status |
@@ -564,7 +688,7 @@ Options:
 | `download` | `--format` | Validity: `csv`, `xlsx`, or `json` |
 | `download` | `--only` | Keep only matching rows: `valid`, `invalid`, `found`, or `breached` |
 | `download` | `--out` | Write to a file instead of stdout |
-| `retry` | | Re-drive dead-lettered chunks (validity/identity; password has no retry) |
+| `retry` | | Re-drive dead-lettered chunks (validity/identity/breaches; password has no retry) |
 
 > `--only` is the single row filter across `email bulk`, `email breaches`, and
 > `jobs`. The older `--valid-only` / `--found-only` / `--breached` flags still
@@ -825,6 +949,10 @@ de-duplicated, and invalid or failed checks are not charged.
 | `email bulk` | 1 credit per successful unique email |
 | `jobs` (validity / identity) | 1 credit per successful unique email |
 | `jobs --type password` | 1 credit per unique password hash |
+| `jobs --type breaches` | 1 credit per successful unique email |
+| `malware url` / `file` / `image` | 1 credit per scan |
+| `malware qr` / `barcode` | 1 credit per decoded code in the image |
+| `jobs watch` | Free — watching for finished jobs does not consume credits |
 | `lists` | Free — list management does not consume credits |
 | `keys` | Free — key management does not consume credits |
 | `webhooks` | Free — webhook management does not consume credits |

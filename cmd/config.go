@@ -106,6 +106,7 @@ var showConfigCmd = &cobra.Command{
 			"API Key", maskedKey,
 			"Base URL", app.cfg.BaseURL,
 			"Output", app.cfg.Output,
+			"Notifications", notifySummary(app.cfg.Notifications),
 		)
 		fmt.Println()
 	},

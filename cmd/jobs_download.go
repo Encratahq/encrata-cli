@@ -9,7 +9,7 @@ import (
 
 var jobsResultsCmd = &cobra.Command{
 	Use:   "results [job-id]",
-	Short: "Fetch results of a job (use --type for identity or password)",
+	Short: "Fetch results of a job (use --type for identity, password, or breaches)",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		jt, err := jobType(cmd)
@@ -57,7 +57,7 @@ var jobsResultsCmd = &cobra.Command{
 
 var jobsDownloadCmd = &cobra.Command{
 	Use:   "download [job-id]",
-	Short: "Download job results (use --type for identity or password)",
+	Short: "Download job results (use --type for identity, password, or breaches)",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		jt, err := jobType(cmd)

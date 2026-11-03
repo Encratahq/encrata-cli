@@ -14,16 +14,27 @@ var emailBreachesCmd = &cobra.Command{
 	Long: `List known data breaches an email address is exposed in.
 
 Pass a single email to check it, or use --bulk with a file (or - for STDIN)
-to stream a whole list. Add --fail-on-finding to exit with code 2 when any
-email is breached (otherwise the command exits 0).
+to check a whole list. Lists of up to 200 emails stream live; larger lists (or
+--job) run as an async job that is polled to completion here, then saved to the
+same result file. Press Ctrl+C while waiting to stop watching: the job keeps
+running and you can collect it later with ` + "`encrata jobs ... --type breaches`" + `.
+
+Add --fail-on-finding to exit with code 2 when any email is breached
+(otherwise the command exits 0).
 
 Examples:
   encrata email breaches jane@acme.com
   encrata email breaches emails.csv --bulk
-  encrata email breaches emails.csv --bulk --out breaches.csv`,
+  encrata email breaches emails.csv --bulk --out breaches.csv
+  encrata email breaches big-list.csv --bulk --job`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		bulk, _ := cmd.Flags().GetBool("bulk")
+		forceStream, _ := cmd.Flags().GetBool("stream")
+		forceJob, _ := cmd.Flags().GetBool("job")
+		if !bulk && (forceStream || forceJob) {
+			return friendlyFormatError(cmd, "--stream and --job only apply with --bulk")
+		}
 		if bulk {
 			path := ""
 			if len(args) == 1 {
@@ -43,11 +54,20 @@ Examples:
 }
 
 func init() {
-	emailBreachesCmd.Flags().Bool("full", false, "Show exposed/registered services")
-	emailBreachesCmd.Flags().Bool("bulk", false, "Check a file (or - for STDIN) of emails via streaming")
-	emailBreachesCmd.Flags().String("format", "", "Bulk export format: csv, xlsx, or json (default: inferred from --out)")
-	emailBreachesCmd.Flags().String("only", "", "Export only rows matching: breached")
-	emailBreachesCmd.Flags().Bool("fail-on-finding", false, "Exit with code 2 if any email is found in a breach (--bulk)")
+	registerBreachesFlags(emailBreachesCmd)
+}
+
+// registerBreachesFlags adds the `email breaches` flags (--out is added with the
+// other single-email commands in email.go).
+func registerBreachesFlags(cmd *cobra.Command) {
+	cmd.Flags().Bool("full", false, "Show exposed/registered services")
+	cmd.Flags().Bool("bulk", false, "Check a file (or - for STDIN) of emails (streams up to 200, async job above)")
+	cmd.Flags().Bool("stream", false, "Force live streaming (SSE) mode (--bulk)")
+	cmd.Flags().Bool("job", false, "Run as an async job and wait here (same engine as the `jobs` command) (--bulk)")
+	cmd.Flags().String("format", "", "Bulk export format: csv, xlsx, or json (default: inferred from --out)")
+	cmd.Flags().String("only", "", "Export only rows matching: breached")
+	cmd.Flags().Bool("fail-on-finding", false, "Exit with code 2 if any email is found in a breach (--bulk)")
+	addNotifyFlags(cmd)
 }
 
 func renderBreaches(full bool) func(map[string]interface{}) {
