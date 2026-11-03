@@ -28,4 +28,5 @@ Thumbs.db
 /email-breaches.csv
 /email-identity.csv
 /emails.csv
+/encrata-cli-results/
 tests/e2e/*.csv

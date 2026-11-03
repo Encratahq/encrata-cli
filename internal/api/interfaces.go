@@ -66,6 +66,19 @@ type PasswordJobAPI interface {
 	RetryPasswordJob(ctx context.Context, id string) (json.RawMessage, error)
 }
 
+// BreachesJobAPI covers async bulk email-breaches jobs.
+type BreachesJobAPI interface {
+	CreateBreachesJob(ctx context.Context, emails []string, fileName string) (json.RawMessage, error)
+	GetBreachesJob(ctx context.Context, id string) (json.RawMessage, error)
+	ListBreachesJobs(ctx context.Context) (json.RawMessage, error)
+	GetBreachesJobResults(ctx context.Context, id string, page, pageSize int, breachedOnly bool) (json.RawMessage, error)
+	DownloadBreachesJob(ctx context.Context, id string, breachedOnly bool, format string) ([]byte, error)
+	CancelBreachesJob(ctx context.Context, id string) (json.RawMessage, error)
+	RetryBreachesJob(ctx context.Context, id string) (json.RawMessage, error)
+	PollBreachesJob(ctx context.Context, id string, onUpdate func(*BreachesJob)) (*BreachesJob, error)
+	FetchBreachesJobItems(ctx context.Context, id string, breachedOnly bool, onPage func([]BreachesJobItem) error) error
+}
+
 // BulkJobAPI covers generic bulk-job management.
 type BulkJobAPI interface {
 	ListBulkJobs(ctx context.Context) (json.RawMessage, error)
@@ -78,6 +91,7 @@ type JobsAPI interface {
 	ValidityJobAPI
 	IdentityJobAPI
 	PasswordJobAPI
+	BreachesJobAPI
 	BulkJobAPI
 }
 
@@ -167,6 +181,16 @@ type BreachesAPI interface {
 	GetGitHubScan(ctx context.Context, id string) (json.RawMessage, error)
 }
 
+// MalwareAPI exposes single malware scans (url, file, image, qr, barcode).
+type MalwareAPI interface {
+	ScanMalware(ctx context.Context, req MalwareScanRequest) (json.RawMessage, error)
+}
+
+// SubscribeAPI exposes the live bulk-job completion stream.
+type SubscribeAPI interface {
+	Subscribe(ctx context.Context, hooks SubscribeHooks, onEvent func(JobEvent) error) error
+}
+
 // API aggregates every segregated interface; *Client is the sole implementation.
 type API interface {
 	AccountAPI
@@ -182,6 +206,8 @@ type API interface {
 	BulkSearchAPI
 	BreachesAPI
 	ExportsAPI
+	SubscribeAPI
+	MalwareAPI
 }
 
 var _ API = (*Client)(nil)

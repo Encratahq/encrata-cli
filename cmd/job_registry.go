@@ -9,8 +9,8 @@ import (
 )
 
 // jobStrategy encapsulates everything that varies between non-validity async
-// job types (identity, password). Adding a new type is one registry entry — no
-// command handler needs editing (Open/Closed).
+// job types (identity, password, breaches). Adding a new type is one registry
+// entry — no command handler needs editing (Open/Closed).
 type jobStrategy struct {
 	title string
 
@@ -42,15 +42,21 @@ var jobStrategies = map[string]jobStrategy{
 		title:  "Identity",
 		create: createIdentityJob,
 		list:   func(ctx context.Context, c api.JobsAPI) (json.RawMessage, error) { return c.ListIdentityJobs(ctx) },
-		status: func(ctx context.Context, c api.JobsAPI, id string) (json.RawMessage, error) { return c.GetIdentityJob(ctx, id) },
+		status: func(ctx context.Context, c api.JobsAPI, id string) (json.RawMessage, error) {
+			return c.GetIdentityJob(ctx, id)
+		},
 		results: func(ctx context.Context, c api.JobsAPI, id string, page, pageSize int, breached, foundOnly bool) (json.RawMessage, error) {
 			return c.GetIdentityJobResults(ctx, id, page, pageSize, foundOnly || breached)
 		},
 		download: func(ctx context.Context, c api.JobsAPI, id string, breached, foundOnly bool) ([]byte, error) {
 			return c.DownloadIdentityJob(ctx, id, foundOnly || breached)
 		},
-		cancel:        func(ctx context.Context, c api.JobsAPI, id string) (json.RawMessage, error) { return c.CancelIdentityJob(ctx, id) },
-		retry:         func(ctx context.Context, c api.JobsAPI, id string) (json.RawMessage, error) { return c.RetryIdentityJob(ctx, id) },
+		cancel: func(ctx context.Context, c api.JobsAPI, id string) (json.RawMessage, error) {
+			return c.CancelIdentityJob(ctx, id)
+		},
+		retry: func(ctx context.Context, c api.JobsAPI, id string) (json.RawMessage, error) {
+			return c.RetryIdentityJob(ctx, id)
+		},
 		printJob:      printIdentityJob,
 		listColumns:   []string{"ID", "Status", "Total", "Processed", "Found", "Credits"},
 		listRow:       identityListRow,
@@ -62,14 +68,18 @@ var jobStrategies = map[string]jobStrategy{
 		title:  "Password",
 		create: createPasswordJob,
 		list:   func(ctx context.Context, c api.JobsAPI) (json.RawMessage, error) { return c.ListPasswordJobs(ctx) },
-		status: func(ctx context.Context, c api.JobsAPI, id string) (json.RawMessage, error) { return c.GetPasswordJob(ctx, id) },
+		status: func(ctx context.Context, c api.JobsAPI, id string) (json.RawMessage, error) {
+			return c.GetPasswordJob(ctx, id)
+		},
 		results: func(ctx context.Context, c api.JobsAPI, id string, page, pageSize int, breached, foundOnly bool) (json.RawMessage, error) {
 			return c.GetPasswordJobResults(ctx, id, page, pageSize, breached)
 		},
 		download: func(ctx context.Context, c api.JobsAPI, id string, breached, foundOnly bool) ([]byte, error) {
 			return c.DownloadPasswordJob(ctx, id, breached)
 		},
-		cancel:        func(ctx context.Context, c api.JobsAPI, id string) (json.RawMessage, error) { return c.CancelPasswordJob(ctx, id) },
+		cancel: func(ctx context.Context, c api.JobsAPI, id string) (json.RawMessage, error) {
+			return c.CancelPasswordJob(ctx, id)
+		},
 		retry:         nil,
 		printJob:      printPasswordJob,
 		listColumns:   []string{"ID", "Status", "Total", "Processed", "Breached", "Credits"},
@@ -77,6 +87,32 @@ var jobStrategies = map[string]jobStrategy{
 		resultsKey:    "items",
 		resultColumns: []string{"Line", "Prefix", "Breached", "Count"},
 		resultRow:     passwordResultRow,
+	},
+	"breaches": {
+		title:  "Breaches",
+		create: createBreachesJob,
+		list:   func(ctx context.Context, c api.JobsAPI) (json.RawMessage, error) { return c.ListBreachesJobs(ctx) },
+		status: func(ctx context.Context, c api.JobsAPI, id string) (json.RawMessage, error) {
+			return c.GetBreachesJob(ctx, id)
+		},
+		results: func(ctx context.Context, c api.JobsAPI, id string, page, pageSize int, breached, foundOnly bool) (json.RawMessage, error) {
+			return c.GetBreachesJobResults(ctx, id, page, pageSize, breached || foundOnly)
+		},
+		download: func(ctx context.Context, c api.JobsAPI, id string, breached, foundOnly bool) ([]byte, error) {
+			return c.DownloadBreachesJob(ctx, id, breached || foundOnly, "csv")
+		},
+		cancel: func(ctx context.Context, c api.JobsAPI, id string) (json.RawMessage, error) {
+			return c.CancelBreachesJob(ctx, id)
+		},
+		retry: func(ctx context.Context, c api.JobsAPI, id string) (json.RawMessage, error) {
+			return c.RetryBreachesJob(ctx, id)
+		},
+		printJob:      printBreachesJob,
+		listColumns:   []string{"ID", "Status", "Total", "Processed", "Breached", "Credits"},
+		listRow:       breachesListRow,
+		resultsKey:    "items",
+		resultColumns: []string{"Email", "Breached", "Count", "Services"},
+		resultRow:     breachesResultRow,
 	},
 }
 
@@ -96,6 +132,26 @@ func createIdentityJob(cmd *cobra.Command, args []string, c api.JobsAPI) (json.R
 	}
 	spinner := startSpinner("Creating identity job...")
 	data, err := c.CreateIdentityJob(cmd.Context(), emails, fileName)
+	stopSpinner(spinner)
+	return data, err
+}
+
+// createBreachesJob reads emails from a file arg or STDIN, then submits the job.
+func createBreachesJob(cmd *cobra.Command, args []string, c api.JobsAPI) (json.RawMessage, error) {
+	path := ""
+	if len(args) == 1 {
+		path = args[0]
+	}
+	name, emails, _, err := loadEmails(cmd, path)
+	if err != nil {
+		return nil, err
+	}
+	fileName, _ := cmd.Flags().GetString("file-name")
+	if fileName == "" {
+		fileName = name
+	}
+	spinner := startSpinner("Creating breaches job...")
+	data, err := c.CreateBreachesJob(cmd.Context(), emails, fileName)
 	stopSpinner(spinner)
 	return data, err
 }

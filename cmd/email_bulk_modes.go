@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/Encratahq/cli/internal/api"
 	"github.com/Encratahq/cli/internal/output"
@@ -95,7 +96,7 @@ func runBulkEnrich(cmd *cobra.Command, client api.API, emails []string, out stri
 	return nil
 }
 
-func runBulkStream(cmd *cobra.Command, client api.API, emails []string, fileName, out string, fields []string) error {
+func runBulkStream(cmd *cobra.Command, client api.API, path string, emails []string, fileName, out string, fields []string) error {
 	total := len(emails)
 	asJSON := jsonMode()
 	if !asJSON {
@@ -105,6 +106,7 @@ func runBulkStream(cmd *cobra.Command, client api.API, emails []string, fileName
 	var results []map[string]interface{}
 	var rawResults []json.RawMessage
 	done := 0
+	start := time.Now()
 	streamErr := client.BulkValiditySearch(cmd.Context(), emails, fileName, func(ev api.BulkEvent) error {
 		switch ev.Type {
 		case "result":
@@ -133,8 +135,13 @@ func runBulkStream(cmd *cobra.Command, client api.API, emails []string, fileName
 		fmt.Println()
 	}
 	if streamErr != nil {
-		output.Error(streamErr.Error())
-		return streamErr
+		return handleStreamFailure(streamFailure{
+			err:     streamErr,
+			elapsed: time.Since(start),
+			done:    done,
+			total:   total,
+			retry:   asyncRetryHint(cmd, path, "--job"),
+		}, out, rawResults, func(out string) error { return exportBulk(cmd, out, results) })
 	}
 
 	if asJSON {

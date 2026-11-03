@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-03
+
+### Added
+- `malware url|file|image|qr|barcode` - single malware scans returning a verdict
+  (`clean`, `suspicious`, `malicious`, `unknown`), a 0-100 risk score, the
+  signals behind it, decoded codes (qr/barcode) and indicators of compromise.
+  `malware file` uploads up to 10MB inline, or scans a larger file (up to 100MB)
+  by download link with `--source-url`. `--stix` attaches a STIX 2.1 bundle and
+  `--fail-on-finding` exits 2 on a suspicious or malicious verdict. Targets
+  `POST /api/cli/malware/scan`.
+- `jobs watch [--job <id>] [--type <kind>]` - wait for bulk jobs to finish over
+  the live completion stream (`GET /api/cli/subscribe`) instead of polling. With
+  `--job` it exits 0 when the job completed and 1 when it failed or was
+  cancelled; without it, it follows every job until Ctrl+C (`--json` prints one
+  object per job). The stream reconnects with backoff and de-duplicates
+  replayed events.
+- `email breaches --bulk` (job mode) now also listens on the completion stream,
+  so the wait ends as soon as the server announces the job finished; the status
+  poll remains for the progress bar and as the fallback.
+- Desktop notifications when a bulk job finishes: Encrata-branded, with a
+  **View results** button that opens the job on the dashboard (Windows; the link
+  is in the text on macOS/Linux). Off by default and local to the machine:
+  `config notifications on|off|test`, `--on completed,failed,cancelled`, and
+  per-run `--notify` / `--no-notify`. Jobs under 30s in the foreground don't
+  notify unless `--notify` is passed, and bursts while following `jobs watch`
+  are grouped into one notification.
+- `--job` and `--stream` on `email breaches --bulk` to force an async job or a
+  live stream (mutually exclusive, like `email bulk`). Ctrl+C while waiting on
+  the job stops watching without cancelling it and prints the job ID.
+- `jobs ... --type breaches` - `create`, `list`, `status`, `results`,
+  `download`, `cancel` and `retry` for bulk email-breaches jobs.
+- Insufficient-credits (402) failures now follow the server's message with how
+  to check your balance and top up.
+
+### Changed
+- Breaches jobs use the jobs service's current routes: create goes through
+  `POST /api/cli/jobs/bulk` (`{"type":"breaches", ...}`), and results, download,
+  cancel and retry address the job by id (`/api/cli/jobs/{id}[/download|/cancel|/retry]`).
+  The previous per-kind `/api/cli/jobs/breaches/...` routes were removed
+  server-side and returned 405/404. Results are keyset-paged only, so
+  `jobs results --type breaches --page N` walks the cursor to page N.
+
+### Fixed
+- `email breaches <file> --bulk` no longer dies part-way through large lists with
+  `stream error: stream ID 1; INTERNAL_ERROR; received from peer`. The whole list
+  used to go out as one streaming request, which the server caps at 120s; lists
+  over 200 emails now run as an async breaches job (create, live progress while
+  polling, then the rows are downloaded into the same result file, columns and
+  summary as a live run). Lists of 200 or fewer still stream live.
+- A bulk stream that is cut off (`email breaches --bulk --stream`,
+  `email bulk --stream`) no longer discards the rows that already arrived: they
+  are saved to the result file (`Saved 455 of 8,569 results to ... (partial).`),
+  or included in the `--json` output, and the raw transport error is replaced
+  with how long the run lasted, how far it got, and the `--job` command to re-run
+  it.
+
 ## [0.13.0] - 2026-09-18
 
 ### Added
@@ -140,7 +196,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The connected-account spreadsheet route is `/api/workflows/integrations/{id}/sheet`
   (not `/create-sheet`) and returns `{spreadsheet_id, spreadsheet_url, sheet_name}`.
 
-[Unreleased]: https://github.com/Encratahq/encrata-cli/compare/v0.12.1...HEAD
+[Unreleased]: https://github.com/Encratahq/encrata-cli/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.14.0
+[0.13.0]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.13.0
 [0.12.1]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.12.1
 [0.12.0]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.12.0
 [0.11.2]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.11.2

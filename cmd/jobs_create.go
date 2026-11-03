@@ -10,7 +10,7 @@ import (
 
 var jobsCreateCmd = &cobra.Command{
 	Use:   "create [file.csv]",
-	Short: "Create an async job (validity, identity, or password) with --type",
+	Short: "Create an async job (validity, identity, password, or breaches) with --type",
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		jt, err := jobType(cmd)
@@ -60,7 +60,7 @@ var jobsCreateCmd = &cobra.Command{
 
 var jobsListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List jobs (use --type for identity or password)",
+	Short: "List jobs (use --type for identity, password, or breaches)",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		jt, err := jobType(cmd)
 		if err != nil {
@@ -108,7 +108,7 @@ var jobsListCmd = &cobra.Command{
 
 var jobsStatusCmd = &cobra.Command{
 	Use:   "status [job-id]",
-	Short: "Show the status of a job (use --type for identity or password)",
+	Short: "Show the status of a job (use --type for identity, password, or breaches)",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		jt, err := jobType(cmd)

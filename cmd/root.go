@@ -31,6 +31,10 @@ var (
 	jsonOutput bool
 )
 
+// creditsHint follows the server's message on an insufficient-credits (402)
+// failure so the user knows how to recover.
+const creditsHint = "Check your balance with `encrata whoami`, then top up credits at https://encrata.com and re-run."
+
 var rootCmd = &cobra.Command{
 	Use:   "encrata",
 	Short: "Encrata CLI — intelligence lookups from your terminal",
@@ -63,6 +67,16 @@ func Execute() int {
 	if err == nil {
 		return exitOK
 	}
+	// Ctrl+C while waiting on an async job: the job keeps running and the
+	// follow-up hint is already printed, so skip the "Aborted." banner.
+	if errors.Is(err, errJobDetached) {
+		return exitError
+	}
+	// `jobs watch --job` saw the job fail or be cancelled; the outcome line is
+	// already printed.
+	if errors.Is(err, errJobUnsuccessful) {
+		return exitError
+	}
 	if ctx.Err() != nil {
 		output.Error("Aborted.")
 		return exitError
@@ -81,6 +95,7 @@ func Execute() int {
 			return exitAuth
 		case http.StatusPaymentRequired:
 			output.Error(err.Error())
+			fmt.Fprintln(os.Stderr, "  "+output.Dim.Sprint(creditsHint))
 			return exitCredits
 		}
 	}
@@ -114,6 +129,7 @@ func init() {
 	rootCmd.AddCommand(workspaceCmd)
 	rootCmd.AddCommand(workflowsCmd)
 	rootCmd.AddCommand(breachesCmd)
+	rootCmd.AddCommand(malwareCmd)
 	improveArgErrors(rootCmd)
 }
 

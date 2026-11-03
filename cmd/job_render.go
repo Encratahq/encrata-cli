@@ -32,6 +32,19 @@ func printPasswordJob(m map[string]interface{}) {
 	)
 }
 
+// printBreachesJob renders a bulk email-breaches job status block.
+func printBreachesJob(m map[string]interface{}) {
+	output.KV(
+		"ID", getStr(m, "id"),
+		"Status", coloredStatus(getStr(m, "status")),
+		"Total", fmt.Sprintf("%d", getInt(m, "total_emails")),
+		"Processed", fmt.Sprintf("%d", getInt(m, "processed_count")),
+		"Breached", fmt.Sprintf("%d", getInt(m, "breached_count")),
+		"Credits used", fmt.Sprintf("%d", getInt(m, "credits_used")),
+		"Created", jobCreated(getStr(m, "created_at")),
+	)
+}
+
 // Row builders map a job/result record to a table row. Kept per-type so the
 // registry stays declarative and the dispatchers carry no rendering switches.
 
@@ -52,6 +65,25 @@ func passwordListRow(m map[string]interface{}) []string {
 		fmt.Sprintf("%d", getInt(m, "processed_count")),
 		fmt.Sprintf("%d", getInt(m, "breached_count")),
 		fmt.Sprintf("%d", getInt(m, "credits_used")),
+	}
+}
+
+func breachesListRow(m map[string]interface{}) []string {
+	return []string{
+		getStr(m, "id"), getStr(m, "status"),
+		fmt.Sprintf("%d", getInt(m, "total_emails")),
+		fmt.Sprintf("%d", getInt(m, "processed_count")),
+		fmt.Sprintf("%d", getInt(m, "breached_count")),
+		fmt.Sprintf("%d", getInt(m, "credits_used")),
+	}
+}
+
+func breachesResultRow(m map[string]interface{}) []string {
+	return []string{
+		firstNonEmpty(getStr(m, "email"), "—"),
+		yesNo(boolField(m, "breached")),
+		fmt.Sprintf("%d", getInt(m, "breach_count")),
+		firstNonEmpty(getStr(m, "services"), "—"),
 	}
 }
 

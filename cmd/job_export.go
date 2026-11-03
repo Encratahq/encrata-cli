@@ -109,7 +109,7 @@ func validityExportFilter(cmd *cobra.Command) string {
 }
 
 // nonValidityExportFilter maps identity/password flags to an export filter.
-// identity: --found-only / --only found → "found"; password: --breached → "breached".
+// identity: --found-only / --only found → "found"; password/breaches: --breached → "breached".
 func nonValidityExportFilter(cmd *cobra.Command, jt string) string {
 	_, _, foundOnly, breachedOnly := resolveOnlyFilters(cmd)
 	if b, _ := cmd.Flags().GetBool("breached"); b {
@@ -123,7 +123,7 @@ func nonValidityExportFilter(cmd *cobra.Command, jt string) string {
 		if foundOnly {
 			return "found"
 		}
-	case "password":
+	case "password", "breaches":
 		if breachedOnly {
 			return "breached"
 		}

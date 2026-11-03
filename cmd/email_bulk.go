@@ -116,5 +116,5 @@ func runEmailBulk(cmd *cobra.Command, args []string) error {
 		}
 		return runBulkJob(cmd, client, fileName, raw, out)
 	}
-	return runBulkStream(cmd, client, emails, fileName, out, fields)
+	return runBulkStream(cmd, client, path, emails, fileName, out, fields)
 }

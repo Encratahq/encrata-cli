@@ -11,7 +11,7 @@ import (
 
 var jobsCmd = &cobra.Command{
 	Use:   "jobs",
-	Short: "Manage async jobs (validity, identity, password)",
+	Short: "Manage async jobs (validity, identity, password, breaches)",
 }
 
 // printJob renders a job status block with counts, credits, and created time.
@@ -73,7 +73,7 @@ func init() {
 		jobsCreateCmd, jobsListCmd, jobsStatusCmd, jobsResultsCmd,
 		jobsDownloadCmd, jobsCancelCmd, jobsRetryCmd,
 	} {
-		c.Flags().String("type", "validity", "Job type: validity | identity | password")
+		c.Flags().String("type", "validity", "Job type: validity | identity | password | breaches")
 	}
 
 	// create: identity/validity read emails from the file arg or STDIN;

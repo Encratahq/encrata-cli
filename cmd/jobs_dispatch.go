@@ -15,10 +15,10 @@ func jobType(cmd *cobra.Command) (string, error) {
 	switch t {
 	case "", "validity":
 		return "validity", nil
-	case "identity", "password":
+	case "identity", "password", "breaches":
 		return t, nil
 	default:
-		return "", friendlyFormatError(cmd, "--type must be validity, identity, or password")
+		return "", friendlyFormatError(cmd, "--type must be validity, identity, password, or breaches")
 	}
 }
 

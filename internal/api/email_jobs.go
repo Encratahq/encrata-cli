@@ -186,3 +186,109 @@ func (c *Client) CancelBulkJob(ctx context.Context, id string) (json.RawMessage,
 	q.Set("id", id)
 	return c.del(ctx, "/api/cli/jobs/bulk", q, nil)
 }
+
+// Breaches jobs use the jobs service's unified surface: the per-kind
+// /api/jobs/breaches/{results,download,cancel,retry} routes were removed, and a
+// job is now addressed by id. Create goes through the typed bulk entrypoint,
+// because the unified POST /api/jobs only takes a prepared S3 asset_id.
+
+// CreateBreachesJob creates an async bulk email-breaches job. It deliberately
+// skips the transport's automatic retry: a retried create after a lost response
+// would start (and bill) a second job for the same list.
+// POST /api/cli/jobs/bulk {"type":"breaches","emails":[...]}
+func (c *Client) CreateBreachesJob(ctx context.Context, emails []string, fileName string) (json.RawMessage, error) {
+	payload := map[string]interface{}{"type": "breaches", "emails": emails}
+	if fileName != "" {
+		payload["file_name"] = fileName
+	}
+	return c.postWithHeaders(ctx, "/api/cli/jobs/bulk", payload, nil)
+}
+
+// breachesJobPath is the unified by-id route for one job, plus an optional action.
+func breachesJobPath(id, action string) string {
+	p := "/api/cli/jobs/" + url.PathEscape(id)
+	if action != "" {
+		p += "/" + action
+	}
+	return p
+}
+
+// GetBreachesJob fetches a breaches job by id. The per-kind collection still
+// serves ?id= with the breaches job shape (the unified GET /api/jobs/{id} returns
+// the cross-kind index summary instead).
+// GET /api/cli/jobs/breaches?id=
+func (c *Client) GetBreachesJob(ctx context.Context, id string) (json.RawMessage, error) {
+	q := url.Values{}
+	q.Set("id", id)
+	return c.get(ctx, "/api/cli/jobs/breaches", q)
+}
+
+// ListBreachesJobs lists breaches jobs (paginated).
+// GET /api/cli/jobs/breaches
+func (c *Client) ListBreachesJobs(ctx context.Context) (json.RawMessage, error) {
+	return c.get(ctx, "/api/cli/jobs/breaches", nil)
+}
+
+// GetBreachesJobResults fetches one page of breaches job rows. The unified
+// results route is keyset-paged only, so page N is reached by walking the cursor
+// from the start; the returned body is that page ({items, next_cursor}).
+// GET /api/cli/jobs/{id}?type=breaches&cursor=&page_size=&breached=1
+func (c *Client) GetBreachesJobResults(ctx context.Context, id string, page, pageSize int, breachedOnly bool) (json.RawMessage, error) {
+	if page < 1 {
+		page = 1
+	}
+	cursor := "0" // the first keyset page
+	for n := 1; ; n++ {
+		data, err := c.breachesResultsPage(ctx, id, cursor, pageSize, breachedOnly)
+		if err != nil || n == page {
+			return data, err
+		}
+		p, err := decodeBreachesItemsPage(data)
+		if err != nil {
+			return nil, err
+		}
+		if p.NextCursor == nil || *p.NextCursor == "" || *p.NextCursor == cursor {
+			return json.RawMessage(`{"items":[],"next_cursor":""}`), nil // past the last page
+		}
+		cursor = *p.NextCursor
+	}
+}
+
+// breachesResultsPage fetches one keyset page of a breaches job's rows.
+func (c *Client) breachesResultsPage(ctx context.Context, id, cursor string, pageSize int, breachedOnly bool) (json.RawMessage, error) {
+	q := url.Values{}
+	q.Set("type", "breaches")
+	q.Set("cursor", cursor)
+	if pageSize > 0 {
+		q.Set("page_size", strconv.Itoa(pageSize))
+	}
+	if breachedOnly {
+		q.Set("breached", "1")
+	}
+	return c.get(ctx, breachesJobPath(id, ""), q)
+}
+
+// DownloadBreachesJob downloads breaches job output bytes (format csv or json).
+// GET /api/cli/jobs/{id}/download?breached=1&format=
+func (c *Client) DownloadBreachesJob(ctx context.Context, id string, breachedOnly bool, format string) ([]byte, error) {
+	q := url.Values{}
+	if breachedOnly {
+		q.Set("breached", "1")
+	}
+	if format != "" {
+		q.Set("format", format)
+	}
+	return c.getBytes(ctx, breachesJobPath(id, "download"), q)
+}
+
+// CancelBreachesJob cancels a running breaches job.
+// POST /api/cli/jobs/{id}/cancel
+func (c *Client) CancelBreachesJob(ctx context.Context, id string) (json.RawMessage, error) {
+	return c.postQuery(ctx, breachesJobPath(id, "cancel"), nil, nil)
+}
+
+// RetryBreachesJob retries dead-lettered breaches chunks.
+// POST /api/cli/jobs/{id}/retry
+func (c *Client) RetryBreachesJob(ctx context.Context, id string) (json.RawMessage, error) {
+	return c.postQuery(ctx, breachesJobPath(id, "retry"), nil, nil)
+}
