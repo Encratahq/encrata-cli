@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-11-12
+
+### Fixed
+
+- `encrata malware` scans now print `Credits used` for each lookup (ENC-2755).
+- `encrata malware qr` / `barcode` now list the warnings raised on each decoded
+  link (e.g. "URL uses a raw IP address"), matching the dashboard (ENC-2756).
+
+### Changed
+
+- `encrata workflows` (`wf`) is hidden from help, the command list and shell
+  completion, and removed from the README. It still runs if invoked directly.
+
 ## [0.14.0] - 2026-11-03
 
 ### Added
@@ -196,7 +209,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The connected-account spreadsheet route is `/api/workflows/integrations/{id}/sheet`
   (not `/create-sheet`) and returns `{spreadsheet_id, spreadsheet_url, sheet_name}`.
 
-[Unreleased]: https://github.com/Encratahq/encrata-cli/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/Encratahq/encrata-cli/compare/v0.14.1...HEAD
+[0.14.1]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.14.1
 [0.14.0]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.14.0
 [0.13.0]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.13.0
 [0.12.1]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.12.1

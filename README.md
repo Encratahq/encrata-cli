@@ -227,7 +227,6 @@ encrata keys --help
 encrata webhooks --help
 encrata workspace --help
 encrata lists --help
-encrata workflows --help
 ```
 
 ---
@@ -697,56 +696,6 @@ Options:
 > **Note:** `jobs <verb> --type` is the single async-job surface. The former
 > standalone `identity-jobs` / `password-jobs` groups and the MCP-style names
 > (`bulk-validate-emails`, `get-email-job-status`, …) have been removed.
-
----
-
-### `encrata workflows` (alias: `wf`)
-
-Run a saved workflow against a CSV, TXT, or XLSX file, track the run, and
-download the resulting enriched CSV. The workflow itself is created and
-configured in the Encrata app; the CLI provides the bulk execution flow.
-
-```bash
-# 1. Upload source emails and copy the returned file ID
-encrata workflows upload emails.xlsx
-
-# 2. Start the saved workflow over that file
-encrata workflows run WORKFLOW_ID --file FILE_ID
-
-# 3. Check progress, then download the completed CSV
-encrata workflows status RUN_ID
-encrata workflows download RUN_ID --out enriched-results.csv
-
-# Manage or filter workflow runs
-encrata workflows runs --workflow-id WORKFLOW_ID
-encrata workflows cancel RUN_ID --yes
-```
-
-Subcommands:
-
-| Command | Description |
-| ------- | ----------- |
-| `upload <file>` | Upload a CSV, TXT, or XLSX input file; `--workflow-id` optionally associates it with a workflow. |
-| `run <workflow-id>` | Start a bulk run; requires `--file <file-id>`. |
-| `status <run-id>` | Show the run state, credit use, output rows, and step results. |
-| `runs` | List runs; use `--workflow-id`, `--limit`, and `--offset` to filter or paginate. |
-| `cancel <run-id>` | Request cooperative cancellation; add `--yes` to skip the prompt. |
-| `download <run-id>` | Save the run's generated CSV; `--out` defaults to `run-<id>.csv`. |
-| `integrations` (`int`) | Manage connected destinations such as Google Sheets, HubSpot, and Salesforce. |
-
-For connected export destinations:
-
-```bash
-encrata workflows integrations providers
-encrata workflows integrations list
-encrata workflows integrations create-sheet INTEGRATION_ID --title "Enriched leads"
-encrata workflows integrations disconnect INTEGRATION_ID --yes
-```
-
-Use `encrata workflows integrations session --json` to retrieve the short-lived
-Nango Connect session token for a browser-based connection flow, then save the
-completed connection with `integrations save --connection-id ...
---provider-config-key ...`.
 
 ---
 
