@@ -285,8 +285,9 @@ encrata email validity emails.csv --bulk --out results.csv --only valid
 ```
 
 Bulk mode (`--bulk`) is the uniform spelling of `email bulk` and takes the same
-flags: `--out`, `--format`, `--only valid|invalid|found`, `--stream`, `--job`,
-`--enrich`, `--concurrency`, `--columns`.
+flags: `--out`, `--format`, `--only valid|invalid|found`,
+`--enrich`, `--concurrency`, `--columns`. Every list runs as the dashboard's
+job, so the same file gives the same counts, credits and report in both.
 
 ---
 
@@ -549,9 +550,12 @@ locally before anything is sent. Targets `POST /api/cli/malware/scan`.
 
 ### `encrata email bulk`
 
-Validate a batch of emails from a CSV/text file or STDIN. Small batches stream
-live results over the terminal with a progress bar; large batches (or `--job`)
-run as an async job that is polled to completion.
+Validate a batch of emails from a CSV/text file or STDIN. Every batch, whatever
+its size, runs as an async job (the same job the dashboard runs) and is polled
+to completion with a progress bar. The same file therefore gives the same
+Deliverable / Undeliverable / Risky counts, credits and downloaded report in the
+CLI and the dashboard, and uploading an identical list again reuses the
+existing job instead of checking and charging it twice.
 
 By default, bulk validation uses the lean, high-throughput path and returns
 `email`, `status`, and `reason` per row. Add `--enrich` to run the full
@@ -564,8 +568,8 @@ encrata email bulk emails.csv --out results.csv
 encrata email bulk emails.csv --enrich --out results.csv
 encrata email bulk emails.csv --enrich --concurrency 16 --only valid --out valid.csv
 encrata email bulk emails.csv --out results.xlsx --columns email,status,trust_grade
-encrata email bulk emails.csv --job --out results.json --format json
-cat emails.csv | encrata email bulk - --stream
+encrata email bulk emails.csv --out results.json --format json
+cat emails.csv | encrata email bulk -
 ```
 
 > `email bulk emails.csv` and `email validity emails.csv --bulk` are equivalent
@@ -575,8 +579,6 @@ Options:
 
 | Flag | Description |
 | ---- | ----------- |
-| `--stream` | Force live streaming (SSE) mode |
-| `--job` | Run as an async job and wait here (same engine as `jobs`; use `jobs` to start one and return later) |
 | `--enrich` | Fill every export column with the full per-email report (same 1 credit/email, just slower) |
 | `--concurrency` | Parallel lookups when `--enrich` is set (default 8) |
 | `--out` | Write results to a file (`.csv`, `.xlsx`, or `.json`) |
@@ -584,11 +586,12 @@ Options:
 | `--columns` | Subset of columns to export (`email`, `status`, `reason` always included) |
 | `--only` | Export only matching rows: `valid`, `invalid`, or `found` |
 
-Batches larger than 1,000 emails automatically switch to job mode unless
-`--stream` is set (the CLI prints a notice when it does). Both paths bill 1
-credit per successful unique email - the difference is speed vs detail: the lean
-default returns `email`, `status`, `reason` fast, while `--enrich` runs the full
-per-email report (all columns) and is slower.
+The default bills 1 credit per address the mail server answered for (an
+address already paid for within the billing window is free). `--enrich` runs
+the full per-email report instead (all columns) and is slower. The old
+`--stream` and `--job` flags are still accepted, but they do nothing: every list
+runs as a job on `POST /api/cli/jobs/bulk`. Use `encrata jobs` to start a job
+and come back for it later.
 
 #### Export columns
 

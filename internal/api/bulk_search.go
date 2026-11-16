@@ -12,12 +12,6 @@ type BulkEvent struct {
 	Data json.RawMessage
 }
 
-// BulkValiditySearch streams validity results for many emails over SSE.
-// POST /api/cli/email/bulk-validity-search
-func (c *Client) BulkValiditySearch(ctx context.Context, queries []string, fileName string, onEvent func(BulkEvent) error) error {
-	return c.bulkSearch(ctx, "/api/cli/email/bulk-validity-search", queries, fileName, onEvent)
-}
-
 // BulkBreachesSearch streams breach results for many emails over SSE.
 // POST /api/cli/email/bulk-breaches-search
 func (c *Client) BulkBreachesSearch(ctx context.Context, queries []string, fileName string, onEvent func(BulkEvent) error) error {

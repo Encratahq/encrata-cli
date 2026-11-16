@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/Encratahq/cli/internal/api"
 	"github.com/Encratahq/cli/internal/output"
@@ -80,72 +79,6 @@ func runBulkEnrich(cmd *cobra.Command, client api.API, emails []string, out stri
 
 	if asJSON {
 		output.JSON(rawResultsArray(cleanRaw))
-		if out != "" {
-			return exportBulk(cmd, out, results)
-		}
-		return nil
-	}
-
-	fmt.Println()
-	printBulkSummaryLine(results)
-	// Bulk always persists rows; exportBulk auto-names the file when --out is empty.
-	if err := exportBulk(cmd, out, results); err != nil {
-		return err
-	}
-	printLeanExportHint(cmd, out)
-	return nil
-}
-
-func runBulkStream(cmd *cobra.Command, client api.API, path string, emails []string, fileName, out string, fields []string) error {
-	total := len(emails)
-	asJSON := jsonMode()
-	if !asJSON {
-		output.Header(fmt.Sprintf("Bulk Validity: %d %s", total, plural(total, "email", "emails")))
-	}
-
-	var results []map[string]interface{}
-	var rawResults []json.RawMessage
-	done := 0
-	start := time.Now()
-	streamErr := client.BulkValiditySearch(cmd.Context(), emails, fileName, func(ev api.BulkEvent) error {
-		switch ev.Type {
-		case "result":
-			var m map[string]interface{}
-			if json.Unmarshal(ev.Data, &m) == nil {
-				results = append(results, m)
-				raw := make(json.RawMessage, len(ev.Data))
-				copy(raw, ev.Data)
-				rawResults = append(rawResults, raw)
-			}
-			done++
-			if !asJSON {
-				renderProgress(done, total)
-			}
-		case "error":
-			if !asJSON {
-				var e map[string]interface{}
-				if json.Unmarshal(ev.Data, &e) == nil {
-					output.Error(getStr(e, "error"))
-				}
-			}
-		}
-		return nil
-	})
-	if !asJSON {
-		fmt.Println()
-	}
-	if streamErr != nil {
-		return handleStreamFailure(streamFailure{
-			err:     streamErr,
-			elapsed: time.Since(start),
-			done:    done,
-			total:   total,
-			retry:   asyncRetryHint(cmd, path, "--job"),
-		}, out, rawResults, func(out string) error { return exportBulk(cmd, out, results) })
-	}
-
-	if asJSON {
-		output.JSON(rawResultsArray(rawResults))
 		if out != "" {
 			return exportBulk(cmd, out, results)
 		}

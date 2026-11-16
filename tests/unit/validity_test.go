@@ -10,58 +10,6 @@ import (
 	"github.com/Encratahq/cli/internal/api"
 )
 
-func TestBulkValiditySearchStreamsResults(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/cli/email/bulk-validity-search" {
-			t.Fatalf("unexpected path: %s", r.URL.Path)
-		}
-		w.Header().Set("Content-Type", "text/event-stream")
-
-		// A start event, two result events, then done.
-		_, _ = w.Write([]byte("event: start\ndata: {\"total\":2}\n\n"))
-		_, _ = w.Write([]byte("data: {\"email\":\"one@example.com\",\"validity\":\"valid\"}\n\n"))
-		_, _ = w.Write([]byte("event: result\ndata: {\"email\":\"two@example.com\",\"validity\":\"invalid\"}\n\n"))
-		_, _ = w.Write([]byte("event: done\ndata: {\"processed\":2}\n\n"))
-	}))
-	defer server.Close()
-
-	client := api.New(server.URL, "test-key")
-
-	var emails []string
-	var sawDone bool
-	err := client.BulkValiditySearch(context.Background(), []string{"one@example.com", "two@example.com"}, "list.csv", func(ev api.BulkEvent) error {
-		switch ev.Type {
-		case "result":
-			var res struct {
-				Email string `json:"email"`
-			}
-			if err := json.Unmarshal(ev.Data, &res); err != nil {
-				return err
-			}
-			emails = append(emails, res.Email)
-		case "done":
-			sawDone = true
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("bulk validity search failed: %v", err)
-	}
-
-	want := []string{"one@example.com", "two@example.com"}
-	if len(emails) != len(want) {
-		t.Fatalf("expected %d results, got %d: %v", len(want), len(emails), emails)
-	}
-	for i := range want {
-		if emails[i] != want[i] {
-			t.Fatalf("expected result %d to be %q, got %q", i, want[i], emails[i])
-		}
-	}
-	if !sawDone {
-		t.Fatalf("expected a done event")
-	}
-}
-
 func TestEmailValidityPostsEmail(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/cli/email/validity" {

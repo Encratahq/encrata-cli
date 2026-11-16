@@ -169,9 +169,9 @@ type WorkspaceAPI interface {
 	RemoveWorkspaceMember(ctx context.Context, memberID string) (json.RawMessage, error)
 }
 
-// BulkSearchAPI exposes streaming bulk search.
+// BulkSearchAPI exposes streaming bulk search. Validity has none: every validity
+// list runs as a job (ENC-2783).
 type BulkSearchAPI interface {
-	BulkValiditySearch(ctx context.Context, queries []string, fileName string, onEvent func(BulkEvent) error) error
 	BulkBreachesSearch(ctx context.Context, queries []string, fileName string, onEvent func(BulkEvent) error) error
 }
 

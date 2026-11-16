@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.3] - 2026-11-16
+
+### Fixed
+
+- Bulk email validity (`email bulk`, `email validity --bulk`) gave different
+  Deliverable / Undeliverable / Risky counts, reports and credits than the
+  dashboard for the same file, and could charge the same addresses twice
+  (ENC-2783). Lists of up to 1,000 emails streamed through the legacy
+  `bulk-validity-search` route, which runs another engine and bills every row.
+  Every list now runs as the dashboard's validity job on
+  `POST /api/cli/jobs/bulk`, whatever its size, and the CLI no longer calls
+  `bulk-validity-search`. `--stream` and `--job` are hidden and ignored, so
+  existing scripts keep working.
+
 ## [0.14.2] - 2026-11-16
 
 ### Fixed
@@ -236,7 +250,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The connected-account spreadsheet route is `/api/workflows/integrations/{id}/sheet`
   (not `/create-sheet`) and returns `{spreadsheet_id, spreadsheet_url, sheet_name}`.
 
-[Unreleased]: https://github.com/Encratahq/encrata-cli/compare/v0.14.2...HEAD
+[Unreleased]: https://github.com/Encratahq/encrata-cli/compare/v0.14.3...HEAD
+[0.14.3]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.14.3
 [0.14.2]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.14.2
 [0.14.1]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.14.1
 [0.14.0]: https://github.com/Encratahq/encrata-cli/releases/tag/v0.14.0

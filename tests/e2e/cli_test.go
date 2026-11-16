@@ -72,38 +72,63 @@ func TestEmailValidityRejectsInvalidAddress(t *testing.T) {
 	}
 }
 
-func TestEmailBulkFromFileUsesSSEServer(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/cli/email/bulk-validity-search" {
-			t.Fatalf("unexpected path: %s", r.URL.Path)
+// A small list (2 emails), even with the old --stream flag, runs as the
+// dashboard's validity job on POST /api/cli/jobs/bulk and never touches the
+// legacy bulk-validity-search stream (ENC-2783). The report is the server-built
+// export, the same file the dashboard downloads.
+func TestEmailBulkRunsAsDashboardJob(t *testing.T) {
+	const csvBody = "email,status,reason\none@example.com,valid,accepted\ntwo@example.com,invalid,mailbox_not_found\n"
+	var created, exported bool
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/cli/jobs/bulk":
+			if r.Method != http.MethodPost || r.FormValue("type") != "validity" {
+				t.Errorf("create: %s type=%q", r.Method, r.FormValue("type"))
+			}
+			created = true
+			w.WriteHeader(http.StatusAccepted)
+			_, _ = io.WriteString(w, `{"success":true,"result":{"id":"j-1","status":"queued","total_emails":2}}`)
+		case "/api/cli/jobs/validity":
+			if r.URL.Query().Get("id") != "j-1" {
+				t.Errorf("status id = %q", r.URL.Query().Get("id"))
+			}
+			_, _ = io.WriteString(w, `{"success":true,"result":{"id":"j-1","status":"completed","total_emails":2,`+
+				`"processed_count":2,"valid_count":1,"invalid_count":1,"credits_used":2}}`)
+		case "/api/cli/jobs/exports", "/api/cli/jobs/exports/download":
+			exported = true
+			_, _ = io.WriteString(w, `{"status":"ready","url":"`+srv.URL+`/blob"}`)
+		case "/blob":
+			_, _ = io.WriteString(w, csvBody)
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+			http.NotFound(w, r)
 		}
-		w.Header().Set("Content-Type", "text/event-stream")
-
-		_, _ = w.Write([]byte("event: start\ndata: {\"total\":2}\n\n"))
-		_, _ = w.Write([]byte("data: {\"email\":\"one@example.com\",\"validity\":\"valid\"}\n\n"))
-		_, _ = w.Write([]byte("data: {\"email\":\"two@example.com\",\"validity\":\"invalid\"}\n\n"))
-		_, _ = w.Write([]byte("event: done\ndata: {\"processed\":2}\n\n"))
 	}))
-	defer server.Close()
+	defer srv.Close()
 
 	emailFile := filepath.Join(t.TempDir(), "emails.txt")
 	if err := os.WriteFile(emailFile, []byte("one@example.com\ntwo@example.com\n"), 0o644); err != nil {
 		t.Fatalf("failed to write email file: %v", err)
 	}
+	outFile := filepath.Join(t.TempDir(), "results.csv")
+	env := map[string]string{"ENCRATA_API_KEY": "test-key", "ENCRATA_BASE_URL": srv.URL}
 
-	env := map[string]string{
-		"ENCRATA_API_KEY":  "test-key",
-		"ENCRATA_BASE_URL": server.URL,
-	}
-
-	out, err := runCLI(t, env, "email", "bulk", emailFile, "--stream")
+	out, err := runCLI(t, env, "email", "bulk", emailFile, "--stream", "--out", outFile)
 	if err != nil {
 		t.Fatalf("email bulk failed: %v\n%s", err, out)
 	}
-	for _, want := range []string{"Bulk Validity: 2 emails", "Total", "Valid"} {
+	if !created || !exported {
+		t.Fatalf("created=%v exported=%v\n%s", created, exported, out)
+	}
+	for _, want := range []string{"Validity Job: j-1", "Valid", "Credits used"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("expected output to contain %q, got:\n%s", want, out)
 		}
+	}
+	if got, _ := os.ReadFile(outFile); string(got) != csvBody {
+		t.Fatalf("report = %q, want the server-built export", got)
 	}
 }
 
@@ -320,18 +345,24 @@ const enrichedResult = `{"email":"rich@example.com","validity":"valid","reason":
 
 const bareResult = `{"email":"bare@example.com","validity":"invalid","reason":"hard_reject"}`
 
-// bulkSSEServer returns a server that streams the two fixture rows over SSE.
-func bulkSSEServer(t *testing.T) *httptest.Server {
+// bulkEnrichServer answers the single validity lookups `email bulk --enrich`
+// makes, one fixture row per address, so the CLI-side exporter is exercised.
+func bulkEnrichServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/cli/email/bulk-validity-search" {
-			t.Fatalf("unexpected path: %s", r.URL.Path)
+		if r.URL.Path != "/api/cli/email/validity" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+			http.NotFound(w, r)
+			return
 		}
-		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = io.WriteString(w, "event: start\ndata: {\"total\":2}\n\n")
-		_, _ = io.WriteString(w, "data: "+enrichedResult+"\n\n")
-		_, _ = io.WriteString(w, "data: "+bareResult+"\n\n")
-		_, _ = io.WriteString(w, "event: done\ndata: {\"processed\":2}\n\n")
+		var body struct{ Email string }
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		row := bareResult
+		if body.Email == "rich@example.com" {
+			row = enrichedResult
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"success":true,"message":"","result":`+row+`}`)
 	}))
 }
 
@@ -354,14 +385,14 @@ func colIndex(header []string, name string) int {
 }
 
 func TestBulkExportCSVFlattensColumns(t *testing.T) {
-	server := bulkSSEServer(t)
+	server := bulkEnrichServer(t)
 	defer server.Close()
 
 	emails := writeEmailsFile(t)
 	out := filepath.Join(t.TempDir(), "results.csv")
 	env := map[string]string{"ENCRATA_API_KEY": "test-key", "ENCRATA_BASE_URL": server.URL}
 
-	if o, err := runCLI(t, env, "email", "bulk", emails, "--stream", "--out", out); err != nil {
+	if o, err := runCLI(t, env, "email", "bulk", emails, "--enrich", "--out", out); err != nil {
 		t.Fatalf("bulk export failed: %v\n%s", err, o)
 	}
 
@@ -411,14 +442,14 @@ func TestBulkExportCSVFlattensColumns(t *testing.T) {
 }
 
 func TestBulkExportColumnsSubset(t *testing.T) {
-	server := bulkSSEServer(t)
+	server := bulkEnrichServer(t)
 	defer server.Close()
 
 	emails := writeEmailsFile(t)
 	out := filepath.Join(t.TempDir(), "subset.csv")
 	env := map[string]string{"ENCRATA_API_KEY": "test-key", "ENCRATA_BASE_URL": server.URL}
 
-	if o, err := runCLI(t, env, "email", "bulk", emails, "--stream", "--out", out, "--columns", "trust_grade,domain"); err != nil {
+	if o, err := runCLI(t, env, "email", "bulk", emails, "--enrich", "--out", out, "--columns", "trust_grade,domain"); err != nil {
 		t.Fatalf("bulk export failed: %v\n%s", err, o)
 	}
 
@@ -436,14 +467,14 @@ func TestBulkExportColumnsSubset(t *testing.T) {
 }
 
 func TestBulkExportFoundOnly(t *testing.T) {
-	server := bulkSSEServer(t)
+	server := bulkEnrichServer(t)
 	defer server.Close()
 
 	emails := writeEmailsFile(t)
 	out := filepath.Join(t.TempDir(), "found.csv")
 	env := map[string]string{"ENCRATA_API_KEY": "test-key", "ENCRATA_BASE_URL": server.URL}
 
-	if o, err := runCLI(t, env, "email", "bulk", emails, "--stream", "--out", out, "--found-only"); err != nil {
+	if o, err := runCLI(t, env, "email", "bulk", emails, "--enrich", "--out", out, "--found-only"); err != nil {
 		t.Fatalf("bulk export failed: %v\n%s", err, o)
 	}
 
@@ -462,14 +493,14 @@ func TestBulkExportFoundOnly(t *testing.T) {
 }
 
 func TestBulkExportValidOnly(t *testing.T) {
-	server := bulkSSEServer(t)
+	server := bulkEnrichServer(t)
 	defer server.Close()
 
 	emails := writeEmailsFile(t)
 	out := filepath.Join(t.TempDir(), "valid-only.csv")
 	env := map[string]string{"ENCRATA_API_KEY": "test-key", "ENCRATA_BASE_URL": server.URL}
 
-	if o, err := runCLI(t, env, "email", "bulk", emails, "--stream", "--out", out, "--valid-only"); err != nil {
+	if o, err := runCLI(t, env, "email", "bulk", emails, "--enrich", "--out", out, "--valid-only"); err != nil {
 		t.Fatalf("bulk export failed: %v\n%s", err, o)
 	}
 
@@ -488,14 +519,14 @@ func TestBulkExportValidOnly(t *testing.T) {
 }
 
 func TestBulkExportJSONRaw(t *testing.T) {
-	server := bulkSSEServer(t)
+	server := bulkEnrichServer(t)
 	defer server.Close()
 
 	emails := writeEmailsFile(t)
 	out := filepath.Join(t.TempDir(), "results.json")
 	env := map[string]string{"ENCRATA_API_KEY": "test-key", "ENCRATA_BASE_URL": server.URL}
 
-	if o, err := runCLI(t, env, "email", "bulk", emails, "--stream", "--out", out, "--format", "json"); err != nil {
+	if o, err := runCLI(t, env, "email", "bulk", emails, "--enrich", "--out", out, "--format", "json"); err != nil {
 		t.Fatalf("bulk export failed: %v\n%s", err, o)
 	}
 
@@ -517,7 +548,7 @@ func TestBulkExportJSONRaw(t *testing.T) {
 }
 
 func TestBulkExportXLSX(t *testing.T) {
-	server := bulkSSEServer(t)
+	server := bulkEnrichServer(t)
 	defer server.Close()
 
 	emails := writeEmailsFile(t)
@@ -525,7 +556,7 @@ func TestBulkExportXLSX(t *testing.T) {
 	env := map[string]string{"ENCRATA_API_KEY": "test-key", "ENCRATA_BASE_URL": server.URL}
 
 	// Format is inferred from the .xlsx extension.
-	if o, err := runCLI(t, env, "email", "bulk", emails, "--stream", "--out", out); err != nil {
+	if o, err := runCLI(t, env, "email", "bulk", emails, "--enrich", "--out", out); err != nil {
 		t.Fatalf("bulk xlsx export failed: %v\n%s", err, o)
 	}
 
