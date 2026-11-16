@@ -71,7 +71,7 @@ var jobsRetryCmd = &cobra.Command{
 
 		requeued := 0
 		var m map[string]interface{}
-		if json.Unmarshal(data, &m) == nil {
+		if json.Unmarshal(api.UnwrapEnvelope(data), &m) == nil {
 			requeued = getInt(m, "requeued")
 		}
 		output.SuccessMsg(fmt.Sprintf("Requeued %d %s", requeued, plural(requeued, "chunk", "chunks")))

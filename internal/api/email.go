@@ -5,10 +5,18 @@ import (
 	"encoding/json"
 )
 
-// EmailValidity checks whether a single email address is valid and deliverable.
+// EmailValidity checks whether a single email address is valid and deliverable,
+// returning the validity report itself. The email service answers this route in
+// the {success, result, message} envelope (ENC-2763); the report is unwrapped
+// here, with the server's message folded in, so every caller (the single lookup,
+// --enrich, --json, --out) reads the same bare report it always has.
 // POST /api/cli/email/validity
 func (c *Client) EmailValidity(ctx context.Context, email string) (json.RawMessage, error) {
-	return c.post(ctx, "/api/cli/email/validity", map[string]string{"email": email})
+	data, err := c.post(ctx, "/api/cli/email/validity", map[string]string{"email": email})
+	if err != nil {
+		return nil, err
+	}
+	return unwrapResult(data), nil
 }
 
 // EmailIdentity resolves the identity behind an email address.

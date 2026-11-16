@@ -7,13 +7,22 @@ import (
 
 var emailValidityCmd = &cobra.Command{
 	Use:   "validity [email|file]",
-	Short: "Validate an email: valid/invalid/catch-all/risky + full report (1 credit)",
+	Short: "Validate an email with a live mail-server check: deliverable/undeliverable/unknown (1 credit)",
 	Long: `Validate a single email address, or a whole list with --bulk.
 
-Charges 1 credit on success; invalid or failed checks are not charged.
+The address is checked live against its mail server. The report shows the
+status (deliverable, undeliverable or unknown), the verdict bulk jobs count
+(valid, invalid, catch-all or risky), the reason, catch-all, mailbox-full,
+disposable and role flags, and a score. --full adds the DNS, connection, SMTP,
+TLS, catch-all test, blocklist and score details.
+
+Charges 1 credit only when the mail server answered; repeats within the billing
+window are free. An address whose server refused our check is shown as
+unverified, never as invalid.
 
 Examples:
   encrata email validity jane@acme.com
+  encrata email validity jane@acme.com --full
   encrata email validity emails.csv --bulk
   encrata email validity emails.csv --bulk --out results.csv --only valid`,
 	Args: cobra.MaximumNArgs(1),
@@ -28,7 +37,7 @@ Examples:
 		return emailLookup(cmd, args[0], "Validity", "Checking validity...",
 			api.API.EmailValidity,
 			renderValidity(full),
-			nil)
+			validityFooter)
 	},
 }
 
@@ -39,9 +48,14 @@ func init() {
 }
 
 // renderValidity returns a renderer for the validity response. Compact by
-// default; full mode adds every detail section.
+// default; full mode adds every detail section. A smtpprobe report renders with
+// its own view (validity_report.go); an older result keeps the legacy one.
 func renderValidity(full bool) func(map[string]interface{}) {
 	return func(r map[string]interface{}) {
+		if isValidityReport(r) {
+			renderValidityReport(r, full)
+			return
+		}
 		status := field(r, "validity", "status")
 		printNonEmptyKV(
 			"Email", field(r, "email"),

@@ -72,18 +72,11 @@ func (c *Client) GetIdentityJobResults(ctx context.Context, id string, page, pag
 	return c.get(ctx, "/api/cli/jobs/identity/results", q)
 }
 
-// GetValidityJobResultsPage fetches paginated validity job rows.
-// GET /api/cli/jobs/validity/results?id=&page=&page_size=
+// GetValidityJobResultsPage fetches one page of validity job rows, unfiltered
+// (see validityResultsPage for the response shape).
+// GET /api/cli/jobs/{id}?type=validity&cursor=&page_size=
 func (c *Client) GetValidityJobResultsPage(ctx context.Context, id string, page, pageSize int) (json.RawMessage, error) {
-	q := url.Values{}
-	q.Set("id", id)
-	if page > 0 {
-		q.Set("page", strconv.Itoa(page))
-	}
-	if pageSize > 0 {
-		q.Set("page_size", strconv.Itoa(pageSize))
-	}
-	return c.get(ctx, "/api/cli/jobs/validity/results", q)
+	return c.validityResultsPage(ctx, id, page, pageSize, "")
 }
 
 // GetPasswordJobResults fetches paginated password job rows.
@@ -141,12 +134,11 @@ func (c *Client) CancelPasswordJob(ctx context.Context, id string) (json.RawMess
 	return c.postQuery(ctx, "/api/cli/jobs/password/cancel", q, nil)
 }
 
-// RetryValidityJob retries dead-lettered validity chunks.
-// POST /api/cli/jobs/validity/retry?id=
+// RetryValidityJob retries dead-lettered validity chunks. The per-kind retry route
+// was retired; a job is retried by id.
+// POST /api/cli/jobs/{id}/retry
 func (c *Client) RetryValidityJob(ctx context.Context, id string) (json.RawMessage, error) {
-	q := url.Values{}
-	q.Set("id", id)
-	return c.postQuery(ctx, "/api/cli/jobs/validity/retry", q, nil)
+	return c.postQuery(ctx, jobPath(id, "retry"), nil, nil)
 }
 
 // RetryIdentityJob retries dead-lettered identity chunks.
@@ -205,7 +197,11 @@ func (c *Client) CreateBreachesJob(ctx context.Context, emails []string, fileNam
 }
 
 // breachesJobPath is the unified by-id route for one job, plus an optional action.
-func breachesJobPath(id, action string) string {
+func breachesJobPath(id, action string) string { return jobPath(id, action) }
+
+// jobPath is the unified by-id route for one job of any kind, plus an optional
+// action (download, cancel, retry).
+func jobPath(id, action string) string {
 	p := "/api/cli/jobs/" + url.PathEscape(id)
 	if action != "" {
 		p += "/" + action

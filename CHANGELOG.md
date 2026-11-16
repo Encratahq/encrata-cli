@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `encrata email validity` showed blank fields and `Credits used: 0`: the email
+  service now wraps validity in `{success, result, message}`. The report is
+  unwrapped (also for `--enrich`, `--json` and `--out`), keeping the bare report
+  shape scripts already read.
+- Validity bulk jobs (`email validity --bulk --job`, `email bulk --job`,
+  `jobs create|results|download|cancel|retry`) called the retired
+  `/api/jobs/validity/...` routes (405/404). They now create through the typed
+  bulk entrypoint and address the job by id, and job status reads the wrapped
+  response instead of polling forever.
+
+### Changed
+
+- `encrata email validity` renders the live mail-server report: status
+  (deliverable / undeliverable / unknown), the verdict, reason, catch-all,
+  mailbox-full, disposable, role and free-provider flags, provider and score.
+  `--full` adds the outcome, DNS, connection, SMTP, TLS, catch-all test,
+  blocklist and score details. An address whose server refused the check is
+  marked unverified, never invalid, and an unanswered check says it was free.
+- Validity exports gain `deliverability`, `score`, `score_grade` and
+  `mailbox_full` columns, and fill reason, message, provider, MX, SPF/DMARC/DKIM
+  and the other columns from the new report. `jobs results` rows carry the
+  full report fields for `--fields`.
+
 ## [0.14.1] - 2026-11-12
 
 ### Fixed

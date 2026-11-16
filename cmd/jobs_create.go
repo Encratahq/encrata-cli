@@ -85,7 +85,7 @@ var jobsListCmd = &cobra.Command{
 			return nil
 		}
 
-		jobs := unwrapArray(data, "jobs")
+		jobs := unwrapArray(api.UnwrapEnvelope(data), "jobs")
 		output.Header(fmt.Sprintf("Validity Jobs: %d", len(jobs)))
 		rows := make([][]string, 0, len(jobs))
 		for _, item := range jobs {

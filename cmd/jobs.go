@@ -32,6 +32,9 @@ func printJob(job *api.Job) {
 		"Credits used", fmt.Sprintf("%d", job.CreditsUsed),
 		"Created", jobCreated(job.CreatedAt),
 	)
+	if job.ErrorMessage != "" {
+		output.Err.Println("  " + job.ErrorMessage)
+	}
 }
 
 // jobCreated renders a job timestamp in local, human-readable form.
