@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `encrata phone` for single phone number lookups: `search` (full report,
+  `--include` to pick sections), `validity`, `risk`, `breaches`, `identity`
+  (reverse lookup) and `voip` (`--current` for portability). Numbers are
+  normalized to E.164 locally, and one without a country code is refused before
+  any request. `risk`, `breaches` and `voip` take `--fail-on-finding` (exit 2).
+  Needs the cli service's `phone` namespace (`POST /api/cli/phone/*`). Bulk
+  phone lookups are not included yet.
+
 ## [0.14.3] - 2026-11-16
 
 ### Fixed

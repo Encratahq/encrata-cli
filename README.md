@@ -125,7 +125,7 @@ when output is not a terminal.
 | ---- | ------- |
 | `0` | Success (or a finding when `--fail-on-finding` is not set) |
 | `1` | Operational error (bad usage, network, or server); `jobs watch --job` also exits 1 when the job failed or was cancelled |
-| `2` | A finding was detected — breach/leak, or a suspicious/malicious malware verdict — only with `--fail-on-finding` |
+| `2` | A finding was detected — breach/leak, a suspicious/malicious malware verdict, or a flagged phone number — only with `--fail-on-finding` |
 | `3` | Authentication failed |
 | `4` | Insufficient credits |
 
@@ -548,6 +548,49 @@ locally before anything is sent. Targets `POST /api/cli/malware/scan`.
 ---
 
 
+### `encrata phone`
+
+Look up one phone number. Numbers need a country code; spaces, dashes, dots and
+parentheses are stripped, and a leading `00` is read as `+`, so
+`"+1 (415) 555-2671"` and `0014155552671` both become `+14155552671`. A number
+without a country code is refused locally before anything is sent.
+
+```bash
+# Full report: format, country, carrier, line type, validation, risk, breaches
+encrata phone search +14155552671
+encrata phone search +14155552671 --include carrier,risk
+
+# Is it real, active and dialable: valid / invalid / risky / unknown
+encrata phone validity "+44 20 7946 0958"
+
+# Fraud and abuse risk: safe / suspicious / high_risk, with the reasons
+encrata phone risk +14155552671
+
+# Exposure in known data breaches
+encrata phone breaches +14155552671
+
+# Reverse lookup: owner name, emails, usernames, socials, sources
+encrata phone identity +14155552671
+
+# VoIP line check; --current also resolves number portability
+encrata phone voip +14155552671 --current
+
+# CI gate: exit 2 when the number is suspicious/high risk, breached, or VoIP
+encrata phone risk +14155552671 --fail-on-finding
+```
+
+| Flag | Description |
+| ---- | ----------- |
+| `--include` | `search` only: limit the report to `format`, `country`, `carrier`, `line_type`, `messaging`, `validation`, `registration`, `risk`, `breaches` |
+| `--current` | `voip` only: resolve portability (today's carrier and line type) |
+| `--fail-on-finding` | `risk`, `breaches`, `voip`: exit with code 2 when the number is flagged |
+| `--out` | Write the full JSON result to a file |
+| `--json` | Print raw JSON output |
+
+Targets `POST /api/cli/phone/{search,validity,risk,breaches,identity,voip}`.
+
+---
+
 ### `encrata email bulk`
 
 Validate a batch of emails from a CSV/text file or STDIN. Every batch, whatever
@@ -904,6 +947,8 @@ de-duplicated, and invalid or failed checks are not charged.
 | `jobs --type breaches` | 1 credit per successful unique email |
 | `malware url` / `file` / `image` | 1 credit per scan |
 | `malware qr` / `barcode` | 1 credit per decoded code in the image |
+| `phone search` / `voip` | 1 credit per lookup |
+| `phone validity` / `risk` / `breaches` / `identity` | 1 credit per number; repeats within the billing window are free |
 | `jobs watch` | Free — watching for finished jobs does not consume credits |
 | `lists` | Free — list management does not consume credits |
 | `keys` | Free — key management does not consume credits |

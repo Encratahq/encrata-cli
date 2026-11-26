@@ -130,6 +130,7 @@ func init() {
 	rootCmd.AddCommand(workflowsCmd)
 	rootCmd.AddCommand(breachesCmd)
 	rootCmd.AddCommand(malwareCmd)
+	rootCmd.AddCommand(phoneCmd)
 	improveArgErrors(rootCmd)
 }
 
