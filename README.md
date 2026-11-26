@@ -199,8 +199,8 @@ job) or `--no-notify`, on `email breaches --bulk` and `jobs watch`.
 | `--no-color` | Disable colored output (also honors the `NO_COLOR` env var) |
 | `--timeout` | Per-request timeout in seconds (0 = default 90s) |
 
-Environment variables: `ENCRATA_API_KEY`, `ENCRATA_BASE_URL`, and `NO_COLOR`
-are all honored. The config file (`~/.encrata/config.yaml`) is written with
+Environment variables: `ENCRATA_API_KEY`, `ENCRATA_BASE_URL`, `NO_COLOR`, and
+`ENCRATA_NO_UPDATE_NOTIFIER` (hide the daily update notice) are all honored. The config file (`~/.encrata/config.yaml`) is written with
 `0600` permissions since it stores the API key. The spinner auto-disables when
 output is not a terminal.
 
@@ -245,11 +245,59 @@ encrata version
 
 ### `encrata update`
 
-Update the CLI binary to the latest GitHub release.
+Update the CLI to the latest GitHub release.
 
 ```bash
-encrata update
+encrata update             # update to the latest release
+encrata update --check     # only report whether a newer version exists
+encrata update --rollback  # go back to the version before the last update
 ```
+
+`update` detects how the CLI was installed and uses the matching method:
+
+| Installed with | What `update` does |
+| -------------- | ------------------ |
+| npm | `npm install -g encrata-cli@latest` (on Windows in a new window, after this process exits) |
+| Homebrew | `brew upgrade encrata` |
+| `install.ps1` or a manual download | Replaces the binary in place (below) |
+
+An in-place update:
+
+1. Downloads the release archive and checks it against the release's
+   `checksums.txt`. A mismatch, or a release without checksums, stops the update
+   with nothing changed.
+2. Swaps the binary in with two renames. This works while the CLI is running,
+   on Windows too, so the update is finished when the command returns.
+3. Runs the new binary once. If it does not start, the previous version is put
+   back automatically.
+4. Keeps the previous version next to the binary (`encrata.previous` /
+   `encrata.previous.exe`) for `--rollback`.
+
+`update` never downgrades: a build newer than the latest release is left alone.
+If the install directory is not writable (for example `/usr/local/bin`), it says
+how to proceed (`sudo encrata update`, or an Administrator terminal on Windows).
+
+**Update notice.** Once a day, in the background, the CLI checks for a newer
+release and prints one line on stderr after a command when one exists. It never
+delays a command by more than a moment, and is off in CI (`CI` set), when stderr
+is not a terminal, with `--json` or `--quiet`, and when
+`ENCRATA_NO_UPDATE_NOTIFIER=1`.
+
+---
+
+### `encrata doctor`
+
+Diagnose the install: version and whether a newer one exists, how the CLI was
+installed, which `encrata` your shell runs (and whether several are on PATH,
+the usual reason an update "didn't work"), whether it can update itself, which
+config and API key are in use (masked), and whether the API accepts the key.
+
+```bash
+encrata doctor
+encrata doctor --json
+```
+
+Exits `1` when a check fails; warnings do not change the exit code.
 
 ---
 

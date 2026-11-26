@@ -1,14 +1,12 @@
 package cmd
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/Encratahq/cli/internal/output"
 	"github.com/Encratahq/cli/internal/version"
@@ -24,36 +22,70 @@ const npmPackage = "encrata-cli"
 var updateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Update the CLI to the latest version",
-	Long: "Check for a newer release and update in place.\n\n" +
-		"Detects how the CLI was installed (npm, Homebrew, or the direct install\n" +
-		"script) and uses the matching update method automatically.",
+	Long: `Check for a newer release and update in place.
+
+Detects how the CLI was installed (npm, Homebrew, or the direct install
+script) and uses the matching update method automatically.
+
+A direct install is updated in place: the download is checked against the
+release's checksums, the new binary must start before the update counts, and
+the previous version is kept so --rollback can restore it.
+
+Examples:
+  encrata update            # update to the latest release
+  encrata update --check    # only report whether an update is available
+  encrata update --rollback # go back to the version before the last update`,
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return runUpdate()
+		if rb, _ := cmd.Flags().GetBool("rollback"); rb {
+			return runRollback()
+		}
+		check, _ := cmd.Flags().GetBool("check")
+		return runUpdate(cmd.Context(), check)
 	},
 }
 
-func runUpdate() error {
-	output.Header("Update Encrata CLI")
-	fmt.Printf("  Current version: v%s\n", version.Version)
+func init() {
+	updateCmd.Flags().Bool("check", false, "Only check whether a newer version is available")
+	updateCmd.Flags().Bool("rollback", false, "Restore the version that was installed before the last update")
+	updateCmd.MarkFlagsMutuallyExclusive("check", "rollback")
+}
 
-	latest, err := latestRelease()
+func runUpdate(ctx context.Context, checkOnly bool) error {
+	current := version.Version
+	output.Header("Update Encrata CLI")
+	fmt.Printf("  Current version: v%s\n", current)
+
+	spinner := startSpinner("Checking for updates...")
+	latest, err := latestRelease(ctx)
+	stopSpinner(spinner)
 	if err != nil {
 		output.Error("Could not check for updates: " + err.Error())
 		return err
 	}
 	fmt.Printf("  Latest version:  v%s\n\n", latest)
+	saveUpdateCache(latest) // keeps the update notice in step with this check
 
-	if version.Version != "dev" && normalizeVersion(latest) == normalizeVersion(version.Version) {
-		output.SuccessMsg("You're already on the latest version.")
+	if cmp, ok := compareVersions(current, latest); ok {
+		switch {
+		case cmp == 0:
+			output.SuccessMsg("You're already on the latest version.")
+			return nil
+		case cmp > 0:
+			output.SuccessMsg(fmt.Sprintf("v%s is newer than the latest release; nothing to update.", current))
+			return nil
+		}
+	}
+	// A "dev" or otherwise unparseable build always counts as older.
+
+	if checkOnly {
+		output.Info(fmt.Sprintf("v%s is available. Run: encrata update", latest))
 		return nil
 	}
 
-	exePath, err := os.Executable()
+	exePath, err := runningExecutable()
 	if err != nil {
-		return fmt.Errorf("could not locate the running binary: %w", err)
-	}
-	if resolved, err := filepath.EvalSymlinks(exePath); err == nil {
-		exePath = resolved
+		return err
 	}
 
 	switch detectInstallMethod(exePath) {
@@ -69,44 +101,49 @@ func runUpdate() error {
 	case "brew":
 		return runManagerUpdate("brew", []string{"upgrade", "encrata"})
 	default:
-		return selfUpdate(exePath, latest)
+		if err := selfUpdate(ctx, exePath, current, latest); err != nil {
+			output.Error(err.Error())
+			return err
+		}
+		return nil
 	}
 }
 
-// latestRelease returns the latest release version (without a leading "v").
-func latestRelease() (string, error) {
-	url := "https://api.github.com/repos/" + updateRepo + "/releases/latest"
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+func runRollback() error {
+	exePath, err := runningExecutable()
 	if err != nil {
-		return "", err
+		return err
 	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "encrata-cli")
-
-	client := &http.Client{Timeout: 20 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
+	switch detectInstallMethod(exePath) {
+	case "npm":
+		return fmt.Errorf("this CLI was installed with npm; install a specific version with: npm install -g %s@<version>", npmPackage)
+	case "brew":
+		return fmt.Errorf("this CLI was installed with Homebrew, which keeps only the current version; reinstall a specific version from https://github.com/%s/releases", updateRepo)
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("GitHub API returned HTTP %d", resp.StatusCode)
+	if err := rollbackBinary(exePath); err != nil {
+		output.Error(err.Error())
+		return err
 	}
-
-	var rel struct {
-		TagName string `json:"tag_name"`
+	now := "the previous version"
+	if out, err := exec.Command(exePath, "version").Output(); err == nil {
+		if line := strings.TrimSpace(strings.SplitN(stripANSI(string(out)), "\n", 2)[0]); line != "" {
+			now = line
+		}
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
-		return "", err
-	}
-	if rel.TagName == "" {
-		return "", fmt.Errorf("no release tag found")
-	}
-	return normalizeVersion(rel.TagName), nil
+	output.SuccessMsg("Rolled back to " + now + ". Run `encrata update --rollback` again to undo.")
+	return nil
 }
 
-func normalizeVersion(v string) string {
-	return strings.TrimPrefix(strings.TrimSpace(v), "v")
+// runningExecutable returns the resolved path of this binary.
+func runningExecutable() (string, error) {
+	exePath, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("could not locate the running binary: %w", err)
+	}
+	if resolved, err := filepath.EvalSymlinks(exePath); err == nil {
+		exePath = resolved
+	}
+	return exePath, nil
 }
 
 // detectInstallMethod inspects the resolved binary path to decide how the CLI

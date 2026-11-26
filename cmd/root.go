@@ -59,11 +59,22 @@ var rootCmd = &cobra.Command{
 }
 
 func Execute() int {
-
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	err := rootCmd.ExecuteContext(ctx)
+	// Delete what an earlier self-update could not (a binary still running at
+	// the time), then start the daily "new version available" check.
+	sweepUpdateLeftovers()
+	notice := startUpdateNotice(os.Args[1:])
+
+	code := exitCode(ctx, rootCmd.ExecuteContext(ctx))
+	notice.print(ctx)
+	return code
+}
+
+// exitCode maps a command's result to the process exit code, printing the
+// error banner where one is due.
+func exitCode(ctx context.Context, err error) int {
 	if err == nil {
 		return exitOK
 	}
@@ -75,6 +86,10 @@ func Execute() int {
 	// `jobs watch --job` saw the job fail or be cancelled; the outcome line is
 	// already printed.
 	if errors.Is(err, errJobUnsuccessful) {
+		return exitError
+	}
+	// `doctor` found a failing check; its report is already printed.
+	if errors.Is(err, errDoctorFailed) {
 		return exitError
 	}
 	if ctx.Err() != nil {
@@ -123,6 +138,7 @@ func init() {
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(updateCmd)
+	rootCmd.AddCommand(doctorCmd)
 	rootCmd.AddCommand(jobsCmd)
 	rootCmd.AddCommand(listsCmd)
 	rootCmd.AddCommand(webhooksCmd)

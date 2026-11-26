@@ -105,6 +105,9 @@ func Save(cfg *Config) error {
 	return os.Chmod(configPath, 0o600)
 }
 
+// FileUsed is the config file Load read, or "" when none was found.
+func FileUsed() string { return viper.ConfigFileUsed() }
+
 func (c *Config) Validate() error {
 	if c.APIKey == "" {
 		return fmt.Errorf("API key required. Set via ENCRATA_API_KEY env var or run: encrata config set-key <key>")

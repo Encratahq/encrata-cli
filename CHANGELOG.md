@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `encrata doctor`: checks the version (and whether a newer one exists), the
+  install method, which `encrata` is on PATH (flagging duplicate installs),
+  whether the CLI can update itself, the config file and API key in use
+  (masked), and API access. `--json` supported; exits 1 when a check fails.
+- `encrata update --check` reports whether a newer version exists, and
+  `encrata update --rollback` restores the version before the last update.
+- A once-a-day "new version available" notice on stderr. Off in CI, off a
+  terminal, with `--json` / `--quiet`, or with `ENCRATA_NO_UPDATE_NOTIFIER=1`.
+- The npm launcher downloads the binary on first run when npm skipped the
+  install script (`--ignore-scripts`), instead of failing.
+
+### Fixed
+
+- Windows: `encrata update` said "Updated" before anything changed, then
+  replaced the binary from a background `.bat` after the CLI exited. That could
+  fail silently (for example if `encrata` was started again meanwhile) or wait
+  on the wrong process. The running binary is now renamed aside and the new one
+  moved in at once, so the update is complete, and verified, when the command
+  returns.
+- `encrata update` installed downloads without checking them. Archives are now
+  verified against the release's `checksums.txt`, and an update is refused when
+  they do not match.
+- A new binary that fails to start is rolled back automatically, instead of
+  leaving a broken install.
+- `encrata update` could install an older release over a newer build (it only
+  checked whether the versions differed); versions are now compared properly.
+- The release lookup no longer depends on the GitHub API, whose 60 requests an
+  hour per IP address shared networks and CI could exhaust (the API remains a
+  fallback).
+- An unwritable install directory now says how to update (`sudo`, or an
+  Administrator terminal on Windows) instead of a bare permission error.
+- Leftover files from interrupted or locked updates (including the `.old` file
+  earlier versions left) are cleaned up automatically.
+
 ## [0.14.3] - 2026-11-16
 
 ### Fixed
