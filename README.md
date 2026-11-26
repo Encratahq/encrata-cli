@@ -125,7 +125,7 @@ when output is not a terminal.
 | ---- | ------- |
 | `0` | Success (or a finding when `--fail-on-finding` is not set) |
 | `1` | Operational error (bad usage, network, or server); `jobs watch --job` also exits 1 when the job failed or was cancelled |
-| `2` | A finding was detected — breach/leak, or a suspicious/malicious malware verdict — only with `--fail-on-finding` |
+| `2` | A finding was detected — breach/leak, a suspicious/malicious malware verdict, or a flagged phone number — only with `--fail-on-finding` |
 | `3` | Authentication failed |
 | `4` | Insufficient credits |
 
@@ -199,8 +199,8 @@ job) or `--no-notify`, on `email breaches --bulk` and `jobs watch`.
 | `--no-color` | Disable colored output (also honors the `NO_COLOR` env var) |
 | `--timeout` | Per-request timeout in seconds (0 = default 90s) |
 
-Environment variables: `ENCRATA_API_KEY`, `ENCRATA_BASE_URL`, and `NO_COLOR`
-are all honored. The config file (`~/.encrata/config.yaml`) is written with
+Environment variables: `ENCRATA_API_KEY`, `ENCRATA_BASE_URL`, `NO_COLOR`, and
+`ENCRATA_NO_UPDATE_NOTIFIER` (hide the daily update notice) are all honored. The config file (`~/.encrata/config.yaml`) is written with
 `0600` permissions since it stores the API key. The spinner auto-disables when
 output is not a terminal.
 
@@ -245,11 +245,59 @@ encrata version
 
 ### `encrata update`
 
-Update the CLI binary to the latest GitHub release.
+Update the CLI to the latest GitHub release.
 
 ```bash
-encrata update
+encrata update             # update to the latest release
+encrata update --check     # only report whether a newer version exists
+encrata update --rollback  # go back to the version before the last update
 ```
+
+`update` detects how the CLI was installed and uses the matching method:
+
+| Installed with | What `update` does |
+| -------------- | ------------------ |
+| npm | `npm install -g encrata-cli@latest` (on Windows in a new window, after this process exits) |
+| Homebrew | `brew upgrade encrata` |
+| `install.ps1` or a manual download | Replaces the binary in place (below) |
+
+An in-place update:
+
+1. Downloads the release archive and checks it against the release's
+   `checksums.txt`. A mismatch, or a release without checksums, stops the update
+   with nothing changed.
+2. Swaps the binary in with two renames. This works while the CLI is running,
+   on Windows too, so the update is finished when the command returns.
+3. Runs the new binary once. If it does not start, the previous version is put
+   back automatically.
+4. Keeps the previous version next to the binary (`encrata.previous` /
+   `encrata.previous.exe`) for `--rollback`.
+
+`update` never downgrades: a build newer than the latest release is left alone.
+If the install directory is not writable (for example `/usr/local/bin`), it says
+how to proceed (`sudo encrata update`, or an Administrator terminal on Windows).
+
+**Update notice.** Once a day, in the background, the CLI checks for a newer
+release and prints one line on stderr after a command when one exists. It never
+delays a command by more than a moment, and is off in CI (`CI` set), when stderr
+is not a terminal, with `--json` or `--quiet`, and when
+`ENCRATA_NO_UPDATE_NOTIFIER=1`.
+
+---
+
+### `encrata doctor`
+
+Diagnose the install: version and whether a newer one exists, how the CLI was
+installed, which `encrata` your shell runs (and whether several are on PATH,
+the usual reason an update "didn't work"), whether it can update itself, which
+config and API key are in use (masked), and whether the API accepts the key.
+
+```bash
+encrata doctor
+encrata doctor --json
+```
+
+Exits `1` when a check fails; warnings do not change the exit code.
 
 ---
 
@@ -547,6 +595,49 @@ locally before anything is sent. Targets `POST /api/cli/malware/scan`.
 
 ---
 
+
+### `encrata phone`
+
+Look up one phone number. Numbers need a country code; spaces, dashes, dots and
+parentheses are stripped, and a leading `00` is read as `+`, so
+`"+1 (415) 555-2671"` and `0014155552671` both become `+14155552671`. A number
+without a country code is refused locally before anything is sent.
+
+```bash
+# Full report: format, country, carrier, line type, validation, risk, breaches
+encrata phone search +14155552671
+encrata phone search +14155552671 --include carrier,risk
+
+# Is it real, active and dialable: valid / invalid / risky / unknown
+encrata phone validity "+44 20 7946 0958"
+
+# Fraud and abuse risk: safe / suspicious / high_risk, with the reasons
+encrata phone risk +14155552671
+
+# Exposure in known data breaches
+encrata phone breaches +14155552671
+
+# Reverse lookup: owner name, emails, usernames, socials, sources
+encrata phone identity +14155552671
+
+# VoIP line check; --current also resolves number portability
+encrata phone voip +14155552671 --current
+
+# CI gate: exit 2 when the number is suspicious/high risk, breached, or VoIP
+encrata phone risk +14155552671 --fail-on-finding
+```
+
+| Flag | Description |
+| ---- | ----------- |
+| `--include` | `search` only: limit the report to `format`, `country`, `carrier`, `line_type`, `messaging`, `validation`, `registration`, `risk`, `breaches` |
+| `--current` | `voip` only: resolve portability (today's carrier and line type) |
+| `--fail-on-finding` | `risk`, `breaches`, `voip`: exit with code 2 when the number is flagged |
+| `--out` | Write the full JSON result to a file |
+| `--json` | Print raw JSON output |
+
+Targets `POST /api/cli/phone/{search,validity,risk,breaches,identity,voip}`.
+
+---
 
 ### `encrata email bulk`
 
@@ -904,6 +995,8 @@ de-duplicated, and invalid or failed checks are not charged.
 | `jobs --type breaches` | 1 credit per successful unique email |
 | `malware url` / `file` / `image` | 1 credit per scan |
 | `malware qr` / `barcode` | 1 credit per decoded code in the image |
+| `phone search` / `voip` | 1 credit per lookup |
+| `phone validity` / `risk` / `breaches` / `identity` | 1 credit per number; repeats within the billing window are free |
 | `jobs watch` | Free — watching for finished jobs does not consume credits |
 | `lists` | Free — list management does not consume credits |
 | `keys` | Free — key management does not consume credits |

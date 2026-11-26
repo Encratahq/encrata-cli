@@ -79,6 +79,13 @@ type BreachesJobAPI interface {
 	FetchBreachesJobItems(ctx context.Context, id string, breachedOnly bool, onPage func([]BreachesJobItem) error) error
 }
 
+// PhoneAPI exposes single phone lookups.
+type PhoneAPI interface {
+	PhoneSearch(ctx context.Context, phone string, include []string) (json.RawMessage, error)
+	PhoneLookup(ctx context.Context, feature, phone string) (json.RawMessage, error)
+	PhoneVoip(ctx context.Context, phone, mode string) (json.RawMessage, error)
+}
+
 // BulkJobAPI covers generic bulk-job management.
 type BulkJobAPI interface {
 	ListBulkJobs(ctx context.Context) (json.RawMessage, error)
@@ -208,6 +215,7 @@ type API interface {
 	ExportsAPI
 	SubscribeAPI
 	MalwareAPI
+	PhoneAPI
 }
 
 var _ API = (*Client)(nil)

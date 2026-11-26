@@ -12,8 +12,19 @@ const path = require("path");
 const binName = process.platform === "win32" ? "encrata-bin.exe" : "encrata-bin";
 const binPath = path.join(__dirname, binName);
 
+// The binary is normally downloaded by the postinstall script. That script does
+// not run when npm installs with --ignore-scripts (or ignore-scripts=true in
+// .npmrc, common in CI and security-hardened setups), so download it now, once,
+// on first use. install.js prints to stdout; send that to stderr so it never
+// mixes into this command's output.
 if (!existsSync(binPath)) {
-  console.error("encrata binary not found. Reinstall with: npm install -g encrata-cli");
+  console.error("encrata: the platform binary is missing (npm's install script did not run). Downloading it now...");
+  spawnSync(process.execPath, [path.join(__dirname, "..", "install.js")], { stdio: ["ignore", 2, 2] });
+}
+
+if (!existsSync(binPath)) {
+  console.error("encrata binary not found, and it could not be downloaded.");
+  console.error("Reinstall with: npm install -g encrata-cli   (without --ignore-scripts)");
   console.error("Or install from source: go install github.com/Encratahq/cli@latest");
   process.exit(1);
 }
